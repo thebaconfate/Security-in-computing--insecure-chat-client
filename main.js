@@ -35,6 +35,7 @@ let userData = {
     name: false
 };
 
+
 ipcMain.on('login', function (event, data) {
     userData.name = data.name;
 

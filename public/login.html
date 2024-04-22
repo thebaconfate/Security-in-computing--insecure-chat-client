@@ -13,8 +13,12 @@
 
         function login() {
             const userName = document.getElementById("inputUserName").value;
-
-            ipcRenderer.send('login', { name: userName });
+            const password = document.getElementById("inputPassword").value;
+            if (!userName || !password ) {
+                alert("Please enter username and password");
+                return;
+            } 
+            ipcRenderer.send('login', { name: userName, password: password });
         }
     </script>
 </head>
@@ -25,10 +29,14 @@
     <div style="width:400px; margin:0 auto;">
         <div class="form-group">
             <label for="inputUserName" style="font-weight: bold; margin-bottom: 0.5em;">Username</label>
-            <input type="string" class="form-control" name="username" id="inputUserName" placeholder="Enter name" autofocus>
+            <input type="string" class="form-control" name="username" id="inputUserName" placeholder="Enter name"
+                autofocus required>
+            <br>
+            <label for="inputPassword" style="font-weight: bold; margin-bottom: 0.5em;">Password</label>
+            <input type="password" class="form-control" name="password" id="inputPassword" placeholder="Enter password"
+                required>
         </div>
-        
-        <button type="submit" class="btn btn-primary" style="margin-top: 1em;" onclick="login()" >Login</button>
+        <button type="submit" class="btn btn-primary" style="margin-top: 1em;" onclick="login()">Login</button>
     </div>
 </body>
 
