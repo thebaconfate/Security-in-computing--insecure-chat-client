@@ -1,205 +1,223 @@
-const io          = require('socket.io-client');
-const electron    = require('electron');
+const io = require("socket.io-client");
+const electron = require("electron");
 
 const SERVER = "localhost";
 const PORT = 3000;
 
-$(function() {
-  // Get user data
-  electron.ipcRenderer.send('get-user-data');
+$(function () {
+	// Get user data
+	electron.ipcRenderer.send("get-user-data");
 
-  electron.ipcRenderer.on('user-data', function (event, data) {
-    load(data);
-  });
+	electron.ipcRenderer.on("user-data", function (event, data) {
+		load(data);
+	});
 });
 
 function load(userdata) {
-  console.log("Loading UI", userdata);
+	console.log("Loading UI", userdata);
 
-  // Initialize variables
-  const $window        = $(window);
-  const $messages      = $('.messages'); // Messages area
-  const $inputMessage  = $('#input-message'); // Input message input box
-  const $usernameLabel = $('#user-name');
-  const $roomList      = $('#room-list');
-  const $userList      = $('#user-list');
- 
+	// Initialize variables
+	const $window = $(window);
+	const $messages = $(".messages"); // Messages area
+	const $inputMessage = $("#input-message"); // Input message input box
+	const $usernameLabel = $("#user-name");
+	const $roomList = $("#room-list");
+	const $userList = $("#user-list");
 
+	let username = userdata.name;
+	let password = userdata.password;
+	$usernameLabel.text(username);
 
-  let username = userdata.name;
-  $usernameLabel.text(username);
+	// Connect to server
+	let connected = false;
+	let socket = io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
 
-  // Connect to server
-  let connected = false;
-  let socket = io(`ws://${SERVER}:${PORT}`, {transports: ['websocket']});
+	let modalShowing = false;
 
-  let modalShowing = false;
+	$("#addChannelModal")
+		.on("hide.bs.modal", () => {
+			modalShowing = false;
+		})
+		.on("show.bs.modal", () => {
+			console.log("show");
+			modalShowing = true;
+		});
 
-  $('#addChannelModal').on('hide.bs.modal', () => {modalShowing = false})
-                       .on('show.bs.modal',   () => {console.log("show"); modalShowing = true});
+	///////////////
+	// User List //
+	///////////////
 
+	let users = {};
 
-  ///////////////
-  // User List //
-  ///////////////
+	function updateUsers(p_users) {
+		p_users.forEach((u) => (users[u.username] = u));
+		updateUserList();
+	}
 
-  let users = {};
+	function updateUser(username, active) {
+		if (!users[username]) users[username] = { username: username };
 
-  function updateUsers(p_users) {
-    p_users.forEach(u => users[u.username] = u);
-    updateUserList();
-  }
+		users[username].active = active;
 
-  function updateUser(username, active) {
-    if (!users[username])
-      users[username] = {username: username};
+		updateUserList();
+	}
 
-    users[username].active = active;
+	function updateUserList() {
+		const $uta = $("#usersToAdd");
+		$uta.empty();
 
-    updateUserList();
-  }
-
-  function updateUserList() {
-    const $uta = $("#usersToAdd");
-    $uta.empty();
-
-    $userList.empty();
-    for (let [un, user] of Object.entries(users)) {
-      if (username !== user.username)
-        $userList.append(`
-          <li onclick="setDirectRoom(this)" data-direct="${user.username}" class="${user.active ? "online" : "offline"}">${user.username}</li>
+		$userList.empty();
+		for (let [un, user] of Object.entries(users)) {
+			if (username !== user.username)
+				$userList.append(`
+          <li onclick="setDirectRoom(this)" data-direct="${
+						user.username
+					}" class="${user.active ? "online" : "offline"}">${user.username}</li>
         `);
-        // append it also to the add user list
-        $uta.append(`
+			// append it also to the add user list
+			$uta.append(`
           <button type="button" class="list-group-item list-group-item-action" data-bs-dismiss="modal" onclick="addToChannel('${user.username}')">${user.username}</button>
-        `); 
-    };
-  }
-
-  ///////////////
-  // Room List //
-  ///////////////
-
-  let rooms = [];
-
-  function updateRooms(p_rooms) {
-    rooms = p_rooms;
-    updateRoomList();
-  }
-
-  function updateRoom(room) {
-    rooms[room.id] = room;
-    updateRoomList();
-  }
-
-  function removeRoom(id) {
-    delete rooms[id];
-    updateRoomList();
-  }
-
-  function updateRoomList() {
-    $roomList.empty();
-    rooms.forEach(r => {
-      if (!r.direct)
-        $roomList.append(`
-          <li onclick="setRoom(${r.id})"  data-room="${r.id}" class="${r.private ? "private" : "public"}">${r.name}</li>
         `);
-    });
-  }
+		}
+	}
 
+	///////////////
+	// Room List //
+	///////////////
 
-  function updateChannels(channels) {
-    const c = $("#channelJoins");
+	let rooms = [];
 
-    c.empty();
-    channels.forEach(r => {
-      if (!rooms[r.id]) 
-        c.append(`
+	function updateRooms(p_rooms) {
+		rooms = p_rooms;
+		updateRoomList();
+	}
+
+	function updateRoom(room) {
+		rooms[room.id] = room;
+		updateRoomList();
+	}
+
+	function removeRoom(id) {
+		delete rooms[id];
+		updateRoomList();
+	}
+
+	function updateRoomList() {
+		$roomList.empty();
+		rooms.forEach((r) => {
+			if (!r.direct)
+				$roomList.append(`
+          <li onclick="setRoom(${r.id})"  data-room="${r.id}" class="${
+					r.private ? "private" : "public"
+				}">${r.name}</li>
+        `);
+		});
+	}
+
+	function updateChannels(channels) {
+		const c = $("#channelJoins");
+
+		c.empty();
+		channels.forEach((r) => {
+			if (!rooms[r.id])
+				c.append(`
           <button type="button" class="list-group-item list-group-item-action" data-bs-dismiss="modal" onclick="joinChannel(${r.id})">${r.name}</button>
-        `); 
-    });
-  }
+        `);
+		});
+	}
 
+	//////////////
+	// Chatting //
+	//////////////
 
-  //////////////
-  // Chatting //
-  //////////////
+	let currentRoom = false;
 
-  let currentRoom = false;
+	function setRoom(id) {
+		let oldRoom = currentRoom;
 
-  function setRoom(id) {
-    let oldRoom = currentRoom;
+		const room = rooms[id];
+		currentRoom = room;
 
-    const room = rooms[id];
-    currentRoom = room;
+		$messages.empty();
+		room.history.forEach((m) => addChatMessage(m));
 
-    $messages.empty();
-    room.history.forEach(m => addChatMessage(m));
+		$userList.find("li").removeClass("active");
+		$roomList.find("li").removeClass("active");
 
-    $userList.find('li').removeClass("active");
-    $roomList.find('li').removeClass("active");
+		if (room.direct) {
+			const idx = room.members.indexOf(username) == 0 ? 1 : 0;
+			const user = room.members[idx];
+			setDirectRoomHeader(user);
 
-    if (room.direct) {
-      const idx = room.members.indexOf(username) == 0 ? 1 : 0;
-      const user = room.members[idx];
-      setDirectRoomHeader(user);
+			$userList
+				.find(`li[data-direct="${user}"]`)
+				.addClass("active")
+				.removeClass("unread")
+				.attr("data-room", room.id);
+		} else {
+			$("#channel-name").text("#" + room.name);
+			$("#channel-description").text(
+				`👤 ${room.members.length} | ${room.description}`
+			);
+			$roomList
+				.find(`li[data-room=${room.id}]`)
+				.addClass("active")
+				.removeClass("unread");
+		}
 
-      $userList.find(`li[data-direct="${user}"]`)
-        .addClass("active")
-        .removeClass("unread")
-        .attr('data-room', room.id);
+		$(".roomAction").css(
+			"visibility",
+			room.direct || room.forceMembership ? "hidden" : "visible"
+		);
+	}
+	window.setRoom = setRoom;
 
-    } else {
-      $('#channel-name').text("#" + room.name);
-      $('#channel-description').text(`👤 ${room.members.length} | ${room.description}`);
-      $roomList.find(`li[data-room=${room.id}]`).addClass("active").removeClass("unread");
-    }
+	function setDirectRoomHeader(user) {
+		$("#channel-name").text(user);
+		$("#channel-description").text(`Direct message with ${user}`);
+	}
 
-    $('.roomAction').css('visibility', (room.direct || room.forceMembership) ? "hidden" : "visible");
-  }
-  window.setRoom = setRoom;
+	function setToDirectRoom(user) {
+		setDirectRoomHeader(user);
+		socket.emit("request_direct_room", { to: user });
+	}
 
-  function setDirectRoomHeader(user) {
-    $('#channel-name').text(user);
-    $('#channel-description').text(`Direct message with ${user}`);
-  }
+	window.setDirectRoom = (el) => {
+		const user = el.getAttribute("data-direct");
+		const room = el.getAttribute("data-room");
 
-  function setToDirectRoom(user) {
-    setDirectRoomHeader(user);
-    socket.emit('request_direct_room', {to: user});
-  }
+		if (room) {
+			setRoom(parseInt(room));
+		} else {
+			setToDirectRoom(user);
+		}
+	};
 
-  window.setDirectRoom = (el) => {
-    const user = el.getAttribute("data-direct");
-    const room = el.getAttribute("data-room");
+	function sendMessage() {
+		let message = $inputMessage.val();
 
-    if (room) {
-      setRoom(parseInt(room));
-    } else {
-      setToDirectRoom(user);
-    }
-  }
+		if (message && connected && currentRoom !== false) {
+			$inputMessage.val("");
 
-  function sendMessage() {
-    let message = $inputMessage.val();
+			const msg = {
+				username: username,
+				message: message,
+				room: currentRoom.id,
+			};
 
-    if (message && connected && currentRoom !== false) {
-      $inputMessage.val('');
+			//addChatMessage(msg);
+			socket.emit("new message", msg);
+		}
+	}
 
-      const msg = {username: username, message: message, room: currentRoom.id};
+	function addChatMessage(msg) {
+		let time = new Date(msg.time).toLocaleTimeString("en-US", {
+			hour12: false,
+			hour: "numeric",
+			minute: "numeric",
+		});
 
-      //addChatMessage(msg);
-      socket.emit('new message', msg);
-    }
-  }
-
-
-  function addChatMessage(msg) {
-    let time = new Date(msg.time).toLocaleTimeString('en-US', { hour12: false, 
-                                                        hour  : "numeric", 
-                                                        minute: "numeric"});
-
-    $messages.append(`
+		$messages.append(`
       <div class="message">
         <div class="message-avatar"></div>
         <div class="message-textual">
@@ -210,154 +228,145 @@ function load(userdata) {
       </div>
     `);
 
-    $messages[0].scrollTop = $messages[0].scrollHeight;
-  }
+		$messages[0].scrollTop = $messages[0].scrollHeight;
+	}
 
-  function messageNotify(msg) {
-    if (msg.direct)
-      $userList.find(`li[data-direct="${msg.username}"]`).addClass('unread');
-    else
-      $roomList.find(`li[data-room=${msg.room}]`).addClass("unread");
-  }
+	function messageNotify(msg) {
+		if (msg.direct)
+			$userList.find(`li[data-direct="${msg.username}"]`).addClass("unread");
+		else $roomList.find(`li[data-room=${msg.room}]`).addClass("unread");
+	}
 
+	function addChannel() {
+		const name = $("#inp-channel-name").val();
+		const description = $("#inp-channel-description").val();
+		const private_ = $("#inp-private").is(":checked");
 
-  function addChannel() {
-    const name        = $("#inp-channel-name").val();
-    const description = $("#inp-channel-description").val();
-    const private_    = $('#inp-private').is(':checked');
+		socket.emit("add_channel", {
+			name: name,
+			description: description,
+			private: private_,
+		});
+	}
+	window.addChannel = addChannel;
 
-    socket.emit('add_channel', {name: name, description: description, private: private_});
-  }
-  window.addChannel = addChannel;
+	function joinChannel(id) {
+		socket.emit("join_channel", { id: id });
+	}
+	window.joinChannel = joinChannel;
 
+	function addToChannel(user) {
+		socket.emit("add_user_to_channel", { channel: currentRoom.id, user: user });
+	}
+	window.addToChannel = addToChannel;
 
-  function joinChannel(id) {
-    socket.emit('join_channel', {id: id});
-  }
-  window.joinChannel = joinChannel;
+	function leaveChannel() {
+		socket.emit("leave_channel", { id: currentRoom.id });
+	}
+	window.leaveChannel = leaveChannel;
 
-  function addToChannel(user) {
-    socket.emit('add_user_to_channel', {channel: currentRoom.id, user: user});   
-  }
-  window.addToChannel = addToChannel;
+	/////////////////////
+	// Keyboard events //
+	/////////////////////
 
-  function leaveChannel() {
-    socket.emit('leave_channel', {id: currentRoom.id});   
-  }
-  window.leaveChannel = leaveChannel;
+	$window.on("keydown", (event) => {
+		if (modalShowing) return;
 
-  /////////////////////
-  // Keyboard events //
-  /////////////////////
+		// Autofocus the current input when a key is typed
+		if (!(event.ctrlKey || event.metaKey || event.altKey)) {
+			$inputMessage.trigger("focus");
+		}
 
-  $window.on("keydown", event => {
-    if(modalShowing)
-      return;
-    
-    // Autofocus the current input when a key is typed
-    if (!(event.ctrlKey || event.metaKey || event.altKey)) {
-      $inputMessage.trigger("focus");
-    }
+		// When the client hits ENTER on their keyboard
+		if (event.which === 13) {
+			sendMessage();
+		}
 
-    // When the client hits ENTER on their keyboard
-    if (event.which === 13) {
-        sendMessage();
-    }
+		// don't add newlines
+		if (event.which === 13 || event.which === 10) {
+			event.preventDefault();
+		}
+	});
 
-    // don't add newlines
-    if (event.which === 13 || event.which === 10) {
-      event.preventDefault();
-    }
-  });
+	///////////////////
+	// server events //
+	///////////////////
 
+	// Whenever the server emits -login-, log the login message
+	socket.on("login", (data) => {
+		connected = true;
 
+		updateUsers(data.users);
+		updateRooms(data.rooms);
+		updateChannels(data.publicChannels);
 
-  ///////////////////
-  // server events //
-  ///////////////////
+		if (data.rooms.length > 0) {
+			setRoom(data.rooms[0].id);
+		}
+	});
 
-  // Whenever the server emits -login-, log the login message
-  socket.on('login', (data) => {
-    connected = true;
+	socket.on("update_public_channels", (data) => {
+		updateChannels(data.publicChannels);
+	});
 
-    updateUsers(data.users);
-    updateRooms(data.rooms);
-    updateChannels(data.publicChannels);
+	// Whenever the server emits 'new message', update the chat body
+	socket.on("new message", (msg) => {
+		const roomId = msg.room;
+		const room = rooms[roomId];
+		if (room) {
+			room.history.push(msg);
+		}
 
-    if (data.rooms.length > 0) {
-      setRoom(data.rooms[0].id);
-    }
-  });
+		if (roomId == currentRoom.id) addChatMessage(msg);
+		else messageNotify(msg);
+	});
 
-  socket.on('update_public_channels', (data) => {
-    updateChannels(data.publicChannels);
-  });
+	socket.on("update_user", (data) => {
+		const room = rooms[data.room];
+		if (room) {
+			room.members = data.members;
 
-  // Whenever the server emits 'new message', update the chat body
-  socket.on('new message', (msg) => {
-    const roomId = msg.room;
-    const room = rooms[roomId];
-    if (room) {
-      room.history.push(msg);
-    }
+			if (room === currentRoom) setRoom(data.room);
+		}
+	});
 
-    if (roomId == currentRoom.id)
-      addChatMessage(msg);
-    else
-      messageNotify(msg);
-  });
+	socket.on("user_state_change", (data) => {
+		updateUser(data.username, data.active);
+	});
 
-  socket.on('update_user', data => {
-    const room = rooms[data.room];
-    if (room) {
-      room.members = data.members;
-      
-      if (room === currentRoom)
-        setRoom(data.room);
-    }
-  });
+	socket.on("update_room", (data) => {
+		updateRoom(data.room);
+		if (data.moveto) setRoom(data.room.id);
+	});
 
-  socket.on('user_state_change', (data) => {
-    updateUser(data.username, data.active);
-  });
+	socket.on("remove_room", (data) => {
+		removeRoom(data.room);
+		if (currentRoom.id == data.room) setRoom(0);
+	});
 
-  socket.on('update_room', data => {
-    updateRoom(data.room);
-    if (data.moveto)
-      setRoom(data.room.id);
-  });
+	////////////////
+	// Connection //
+	////////////////
 
-  socket.on('remove_room', data => {
-    removeRoom(data.room);
-    if (currentRoom.id == data.room)
-      setRoom(0);
-  });
+	socket.on("connect", () => {
+		console.log("connect");
+		socket.emit("join", (username, password));
+	});
 
-  ////////////////
-  // Connection //
-  ////////////////
+	socket.on("disconnect", () => {
+		console.log("disconnect");
+	});
 
-  socket.on('connect', () => {
-    console.log("connect");
-    socket.emit('join', username)
-  });
+	socket.on("reconnect", () => {
+		console.log("reconnect");
 
-  socket.on('disconnect', () => {
-    console.log("disconnect");
+		// join
+		// possibly to login as well?
 
-  });
+		socket.emit("join", username);
+	});
 
-  socket.on('reconnect', () => {
-    console.log("reconnect");
-
-    // join
-    socket.emit('join', username);
-  });
-
-  socket.on('reconnect_error', () => {
-    console.log("reconnect_error");
-
-  });
-
+	socket.on("reconnect_error", () => {
+		console.log("reconnect_error");
+	});
 }
-

@@ -12,12 +12,14 @@
         let ipcRenderer = require('electron').ipcRenderer;
 
         function login() {
+            /*Function called on clicking submit button*/
             const userName = document.getElementById("inputUserName").value;
             const password = document.getElementById("inputPassword").value;
-            if (!userName || !password ) {
+            if (!userName || !password) {
                 alert("Please enter username and password");
                 return;
-            } 
+            }
+            /* Sends the payload to electron in main.js */
             ipcRenderer.send('login', { name: userName, password: password });
         }
     </script>
