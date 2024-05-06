@@ -20,7 +20,7 @@
                 return;
             }
             /* Sends the payload to electron in main.js */
-            ipcRenderer.send("login", { username: username, password: password });
+            ipcRenderer.send("register", { username: username, password: password });
         }
     </script>
 </head>

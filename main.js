@@ -1,22 +1,27 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
+const { hash } = require("./crypto.js");
 const path = require("node:path");
+const io = require("socket.io-client");
+const SERVER = "localhost";
+const PORT = 3000;
 
 function openLogin(win) {
 	win.loadFile("public/login.html");
 }
 
-function openChat(win, data) {
-	/* loads the chat window with data*/
-	const SERVER = "localhost";
-	const PORT = 3000;
-	const io = require("socket.io-client");
+function login(win, credentials) {
 	let socket = io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
-	console.log("logging in with: ", data);
-	socket.emit("join", data);
+	console.log("logging in with: ", credentials);
+	socket.emit("authenticate", credentials);
 
 	socket.on("login", function (data) {
-		win.loadFile("public/chat.html");
+		openChat(win, credentials);
 	});
+}
+
+function openChat(win, data) {
+	/* loads the chat window with data*/
+	win.loadFile("public/chat.html");
 }
 
 function createWindow() {
@@ -41,7 +46,7 @@ app.whenReady().then(() => {
 });
 
 let userData = {
-	name: false,
+	username: false,
 	password: false,
 };
 
@@ -49,10 +54,25 @@ ipcMain.on("login", function (event, data) {
 	/*Function to be called from the client on login, passes data load the chat window,
 	doesn't call login to the server */
 
-	userData.name = data.name;
+	userData.username = data.usernname;
 	userData.password = data.password;
 
-	openChat(BrowserWindow.getAllWindows()[0], data);
+	login(BrowserWindow.getAllWindows()[0], {
+		username: data.username,
+		password: hash(data.password),
+	});
+});
+
+ipcMain.on("register", function (event, data) {
+	let socket = io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
+	data.password = hash(data.password);
+	socket.emit("register", data);
+	socket.on("succesful-registration", function () {
+		openLogin(BrowserWindow.getAllWindows()[0]);
+	});
+	socket.on("failed-registration", function () {
+		console.log("Failed registration");
+	});
 });
 
 ipcMain.on("get-user-data", function (event, arg) {
