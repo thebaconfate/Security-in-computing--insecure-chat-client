@@ -353,7 +353,7 @@ function load(userdata) {
 		/*Calls this function to connect*/
 		console.log("connect");
 		// ! Calls join event on the server
-		socket.emit("join", { name: username, password: password });
+		socket.emit("join", { name: username, password: "chat" });
 	});
 
 	socket.on("disconnect", () => {

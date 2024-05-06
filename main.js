@@ -7,8 +7,16 @@ function openLogin(win) {
 
 function openChat(win, data) {
 	/* loads the chat window with data*/
+	const SERVER = "localhost";
+	const PORT = 3000;
+	const io = require("socket.io-client");
+	let socket = io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
 	console.log("logging in with: ", data);
-	win.loadFile("public/chat.html");
+	socket.emit("join", data);
+
+	socket.on("login", function (data) {
+		win.loadFile("public/chat.html");
+	});
 }
 
 function createWindow() {
@@ -44,7 +52,7 @@ ipcMain.on("login", function (event, data) {
 	userData.name = data.name;
 	userData.password = data.password;
 
-	openChat(BrowserWindow.getAllWindows()[0], userData);
+	openChat(BrowserWindow.getAllWindows()[0], data);
 });
 
 ipcMain.on("get-user-data", function (event, arg) {
