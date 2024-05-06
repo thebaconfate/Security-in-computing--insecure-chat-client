@@ -6,6 +6,8 @@ function openLogin(win) {
 }
 
 function openChat(win, data) {
+	/* loads the chat window with data*/
+	console.log("logging in with: ", data);
 	win.loadFile("public/chat.html");
 }
 
@@ -35,13 +37,14 @@ let userData = {
 	password: false,
 };
 
-/*Function to be called from the client on login*/
 ipcMain.on("login", function (event, data) {
-	console.log(data);
+	/*Function to be called from the client on login, passes data load the chat window,
+	doesn't call login to the server */
+
 	userData.name = data.name;
 	userData.password = data.password;
 
-	openChat(BrowserWindow.getAllWindows()[0], data);
+	openChat(BrowserWindow.getAllWindows()[0], userData);
 });
 
 ipcMain.on("get-user-data", function (event, arg) {

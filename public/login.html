@@ -1,15 +1,15 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>Insecure Chat</title>
 
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="../node_modules/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../node_modules/bootstrap/dist/css/bootstrap.min.css" />
 
     <script type="text/javascript">
-        let ipcRenderer = require('electron').ipcRenderer;
+        let ipcRenderer = require("electron").ipcRenderer;
 
         function login() {
             /*Function called on clicking submit button*/
@@ -20,25 +20,26 @@
                 return;
             }
             /* Sends the payload to electron in main.js */
-            ipcRenderer.send('login', { name: userName, password: password });
+            ipcRenderer.send("login", { name: userName, password: password });
         }
     </script>
 </head>
 
-
 <body>
-    <br><br><br><br>
-    <div style="width:400px; margin:0 auto;">
+    <br /><br /><br /><br />
+    <div style="width: 400px; margin: 0 auto">
         <div class="form-group">
-            <label for="inputUserName" style="font-weight: bold; margin-bottom: 0.5em;">Username</label>
+            <label for="inputUserName" style="font-weight: bold; margin-bottom: 0.5em">Username</label>
             <input type="string" class="form-control" name="username" id="inputUserName" placeholder="Enter name"
-                autofocus required>
-            <br>
-            <label for="inputPassword" style="font-weight: bold; margin-bottom: 0.5em;">Password</label>
+                autofocus required />
+            <br />
+            <label for="inputPassword" style="font-weight: bold; margin-bottom: 0.5em">Password</label>
             <input type="password" class="form-control" name="password" id="inputPassword" placeholder="Enter password"
-                required>
+                required />
         </div>
-        <button type="submit" class="btn btn-primary" style="margin-top: 1em;" onclick="login()">Login</button>
+        <button type="submit" class="btn btn-primary" style="margin-top: 1em" onclick="login()">
+            Login
+        </button>
     </div>
 </body>
 

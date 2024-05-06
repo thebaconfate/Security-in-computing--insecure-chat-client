@@ -26,6 +26,7 @@ function load(userdata) {
 
 	let username = userdata.name;
 	let password = userdata.password;
+	console.log(username, password);
 	$usernameLabel.text(username);
 
 	// Connect to server
@@ -349,8 +350,10 @@ function load(userdata) {
 	////////////////
 
 	socket.on("connect", () => {
+		/*Calls this function to connect*/
 		console.log("connect");
-		socket.emit("join", (username, password));
+		// ! Calls join event on the server
+		socket.emit("join", { name: username, password: password });
 	});
 
 	socket.on("disconnect", () => {
@@ -363,7 +366,7 @@ function load(userdata) {
 		// join
 		// possibly to login as well?
 
-		socket.emit("join", username);
+		socket.emit("join", (username, password));
 	});
 
 	socket.on("reconnect_error", () => {
