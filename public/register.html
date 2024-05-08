@@ -11,7 +11,7 @@
     <script type="text/javascript">
         let ipcRenderer = require("electron").ipcRenderer;
 
-        function login() {
+        function register() {
             /*Function called on clicking submit button*/
             const username = document.getElementById("inputUserName").value;
             const password = document.getElementById("inputPassword").value;
@@ -22,6 +22,18 @@
             /* Sends the payload to electron in main.js */
             ipcRenderer.send("register", { username: username, password: password });
         }
+
+        function navLogin() {
+            ipcRenderer.send("nav-login")
+        }
+
+        ipcRenderer.on("registration-successful", (event, arg) => {
+            alert("Registration successful\nPlease login through the login page");
+        });
+
+        ipcRenderer.on("registration-failed", (event, arg) => {
+            alert(`Registration failed\nReason: ${arg}`);
+        });
     </script>
 </head>
 
@@ -37,9 +49,15 @@
             <input type="password" class="form-control" name="password" id="inputPassword" placeholder="Enter password"
                 required />
         </div>
-        <button type="submit" class="btn btn-primary" style="margin-top: 1em" onclick="login()">
-            Login
+        <button type="submit" class="btn btn-primary" style="margin-top: 1em" onclick="register()">
+            Register
         </button>
+        <div style="display:flex; justify-content: center; align-items: baseline; gap:1rem;">
+            <p>Already have an account? </p>
+            <button type="button" class="btn btn-secondary" onclick="navLogin()">
+                Login
+            </button>
+        </div>
     </div>
 </body>
 

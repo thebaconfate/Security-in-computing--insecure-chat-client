@@ -9,8 +9,16 @@ function openLogin(win) {
 	win.loadFile("public/login.html");
 }
 
+function openRegister(win) {
+	win.loadFile("public/register.html");
+}
+
+function connectToServer() {
+	return io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
+}
+
 function login(win, credentials) {
-	let socket = io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
+	let socket = connectToServer();
 	console.log("logging in with: ", credentials);
 	socket.emit("authenticate", credentials);
 
@@ -63,16 +71,27 @@ ipcMain.on("login", function (event, data) {
 	});
 });
 
+ipcMain.on("nav-register", function (event, arg) {
+	openRegister(BrowserWindow.getAllWindows()[0]);
+});
+
+ipcMain.on("nav-login", function (event, arg) {
+	openLogin(BrowserWindow.getAllWindows()[0]);
+});
+
 ipcMain.on("register", function (event, data) {
-	let socket = io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
-	data.password = hash(data.password);
-	socket.emit("register", data);
-	socket.on("succesful-registration", function () {
-		openLogin(BrowserWindow.getAllWindows()[0]);
-	});
-	socket.on("failed-registration", function () {
-		console.log("Failed registration");
-	});
+	if (data.username && data.password) {
+		let socket = connectToServer();
+		data.password = hash(data.password);
+		socket.emit("register", data, (response) => {
+			console.log(response);
+			if (response.success) {
+				event.sender.send("registration-successful");
+			} else {
+				event.sender.send("registration-failed", response.reason);
+			}
+		});
+	}
 });
 
 ipcMain.on("get-user-data", function (event, arg) {

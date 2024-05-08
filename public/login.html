@@ -22,6 +22,10 @@
             /* Sends the payload to electron in main.js */
             ipcRenderer.send("login", { username: username, password: password });
         }
+
+        function navRegister() {
+            ipcRenderer.send("nav-register")
+        }
     </script>
 </head>
 
@@ -40,6 +44,12 @@
         <button type="submit" class="btn btn-primary" style="margin-top: 1em" onclick="login()">
             Login
         </button>
+        <div style="display:flex; justify-content: center; align-items: baseline; gap:1rem;">
+            <p>Don't have an account? </p>
+            <button type="button" class="btn btn-secondary" style="margin-top: 1em" onclick="navRegister()">
+                Register
+            </button>
+        </div>
     </div>
 </body>
 
