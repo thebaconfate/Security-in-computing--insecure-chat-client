@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const { hash } = require("./crypto.js");
 const path = require("node:path");
 const io = require("socket.io-client");
@@ -62,12 +62,21 @@ ipcMain.on("login", function (event, data) {
 	/*Function to be called from the client on login, passes data load the chat window,
 	doesn't call login to the server */
 
-	userData.username = data.usernname;
-	userData.password = data.password;
+	data.password = hash(data.password);
 
-	login(BrowserWindow.getAllWindows()[0], {
-		username: data.username,
-		password: hash(data.password),
+	const socket = connectToServer();
+	socket.emit("authenticate", data, (response) => {
+		if (response.success) {
+			openChat(BrowserWindow.getAllWindows()[0], data);
+		} else {
+			dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
+				type: "warning",
+				buttons: ["Ok"],
+				title: "Failure",
+				normalizeAccessKeys: true,
+				message: response.reason || "Login failed, unknown reason",
+			});
+		}
 	});
 });
 
@@ -86,12 +95,25 @@ ipcMain.on("register", function (event, data) {
 		socket.emit("register", data, (response) => {
 			console.log(response);
 			if (response.success) {
-				event.sender.send("registration-successful");
+				dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
+					type: "info",
+					buttons: ["Ok"],
+					title: "Success",
+					normalizeAccessKeys: true,
+					message:
+						"Registration successful!\nPlease login through the login page",
+				});
 			} else {
-				event.sender.send("registration-failed", response.reason);
+				dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
+					type: "warning",
+					buttons: ["Ok"],
+					title: "Failure",
+					normalizeAccessKeys: true,
+					message: response.reason || "Registration failed, unknown reason",
+				});
 			}
 		});
-	}
+	} else return;
 });
 
 ipcMain.on("get-user-data", function (event, arg) {
