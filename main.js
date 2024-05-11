@@ -1,5 +1,4 @@
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
-const { hash } = require("./crypto.js");
 const path = require("node:path");
 const io = require("socket.io-client");
 const SERVER = "localhost";
