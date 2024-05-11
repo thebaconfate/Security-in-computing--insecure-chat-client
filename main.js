@@ -61,9 +61,6 @@ let userData = {
 ipcMain.on("login", function (event, data) {
 	/*Function to be called from the client on login, passes data load the chat window,
 	doesn't call login to the server */
-
-	data.password = hash(data.password);
-
 	const socket = connectToServer();
 	socket.emit("authenticate", data, (response) => {
 		if (response.success) {
@@ -91,7 +88,6 @@ ipcMain.on("nav-login", function (event, arg) {
 ipcMain.on("register", function (event, data) {
 	if (data.username && data.password) {
 		let socket = connectToServer();
-		data.password = hash(data.password);
 		socket.emit("register", data, (response) => {
 			console.log(response);
 			if (response.success) {
