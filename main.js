@@ -16,16 +16,6 @@ function connectToServer() {
 	return io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
 }
 
-function login(win, credentials) {
-	let socket = connectToServer();
-	console.log("logging in with: ", credentials);
-	socket.emit("authenticate", credentials);
-
-	socket.on("login", function (data) {
-		openChat(win, credentials);
-	});
-}
-
 function openChat(win, data) {
 	/* loads the chat window with data*/
 	win.loadFile("public/chat.html");
