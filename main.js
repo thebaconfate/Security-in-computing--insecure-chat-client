@@ -51,8 +51,6 @@ app.whenReady().then(() => {
 });
 
 ipcMain.on("login", function (event, data) {
-	/*Function to be called from the client on login, passes data load the chat window,
-	doesn't call login to the server */
 	const socket = connectToServer();
 	socket.emit("authenticate", data, (response) => {
 		if (response.success) {
