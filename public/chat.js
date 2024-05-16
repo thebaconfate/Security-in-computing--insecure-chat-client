@@ -13,8 +13,8 @@ $(function () {
 	});
 });
 
-function load(userdata) {
-	console.log("Loading UI", userdata);
+function load(userData) {
+	console.log("Loading UI", userData);
 
 	// Initialize variables
 	const $window = $(window);
@@ -24,9 +24,9 @@ function load(userdata) {
 	const $roomList = $("#room-list");
 	const $userList = $("#user-list");
 
-	let username = userdata.name;
-	let password = userdata.password;
-	console.log(username, password);
+	let username = userData.username;
+	let chatRooms = userData.chatRooms;
+	let directChats = userData.directChats;
 	$usernameLabel.text(username);
 
 	// Connect to server

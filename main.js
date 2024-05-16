@@ -4,6 +4,14 @@ const io = require("socket.io-client");
 const SERVER = "localhost";
 const PORT = 3000;
 
+let userData = {
+	username: undefined,
+	chatRooms: undefined,
+	directChats: undefined,
+};
+
+let token;
+
 function openLogin(win) {
 	win.loadFile("public/login.html");
 }
@@ -16,7 +24,7 @@ function connectToServer() {
 	return io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
 }
 
-function openChat(win, data) {
+function openDashboard(win, data) {
 	/* loads the chat window with data*/
 	win.loadFile("public/chat.html");
 }
@@ -42,18 +50,15 @@ app.whenReady().then(() => {
 	});
 });
 
-let userData = {
-	username: false,
-	password: false,
-};
-
 ipcMain.on("login", function (event, data) {
 	/*Function to be called from the client on login, passes data load the chat window,
 	doesn't call login to the server */
 	const socket = connectToServer();
 	socket.emit("authenticate", data, (response) => {
 		if (response.success) {
-			openChat(BrowserWindow.getAllWindows()[0], data);
+			userData = { username: data.username };
+			token = response.token;
+			openDashboard(BrowserWindow.getAllWindows()[0], userData);
 		} else {
 			dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
 				type: "warning",
@@ -98,9 +103,21 @@ ipcMain.on("register", function (event, data) {
 				});
 			}
 		});
-	} else return;
+	} else {
+		dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
+			type: "warning",
+			buttons: ["Ok"],
+			title: "Failure",
+			normalizeAccessKeys: true,
+			message: "Please provide a username and password to register",
+		});
+	}
 });
 
 ipcMain.on("get-user-data", function (event, arg) {
-	event.sender.send("user-data", userData);
+	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
+	const socket = connectToServer();
+	socket.emit("get-user-data", { token: token }, (response) => {
+		event.sender.send("user-data", response);
+	});
 });
