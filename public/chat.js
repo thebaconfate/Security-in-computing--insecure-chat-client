@@ -4,7 +4,6 @@ const ipcRender = electron.ipcRenderer;
 
 const SERVER = "localhost";
 const PORT = 3000;
-let directChats = {};
 
 $(function () {
 	// Get user data
@@ -28,9 +27,10 @@ function loadPage(userData) {
 
 	let username = userData.username;
 	$usernameLabel.text(username);
-	let chatRooms = userData.chatRooms || [];
+	let chatRooms = userData.chatRooms;
+	let users = {};
 	updateRoomList();
-	directChats = userData.directChats;
+	updateUsers(userData.directChats);
 
 	// Connect to server
 	let connected = false;
@@ -50,19 +50,20 @@ function loadPage(userData) {
 	///////////////
 	// User List //
 	///////////////
-
-	function unzip(list) {
-		let dict = {};
-		list.forEach((item) => (dict[item.username] = item.ID));
-	}
-
-	let users = {};
-
+	/**
+	 * updates the users list given a list of users
+	 * @param {Array} p_users - list of dictionaries with username and active as properties
+	 */
 	function updateUsers(p_users) {
 		p_users.forEach((u) => (users[u.username] = u));
 		updateUserList();
 	}
 
+	/**
+	 * updates a user in the user list
+	 * @param {string} username - the username of the user to update
+	 * @param {boolean} active - the new active state of the user
+	 */
 	function updateUser(username, active) {
 		if (!users[username]) users[username] = { username: username };
 
@@ -76,17 +77,19 @@ function loadPage(userData) {
 		$uta.empty();
 
 		$userList.empty();
-		for (let [un, user] of Object.entries(users)) {
+		for (let [_, user] of Object.entries(users)) {
 			if (username !== user.username)
-				$userList.append(`
-          <li onclick="setDirectRoom(this)" data-direct="${
+				$userList.append(
+					`<li onclick="setDirectRoom(this)" data-direct="${
 						user.username
-					}" class="${user.active ? "online" : "offline"}">${user.username}</li>
-        `);
+					}" class="${user.active ? "online" : "offline"}">${
+						user.username
+					}</li>`
+				);
 			// append it also to the add user list
-			$uta.append(`
-          <button type="button" class="list-group-item list-group-item-action" data-bs-dismiss="modal" onclick="addToChannel('${user.username}')">${user.username}</button>
-        `);
+			$uta.append(
+				`<button type="button" class="list-group-item list-group-item-action" data-bs-dismiss="modal" onclick="addToChannel('${user.username}')">${user.username}</button>`
+			);
 		}
 	}
 
@@ -322,7 +325,6 @@ function loadPage(userData) {
 		if (room) {
 			room.history.push(msg);
 		}
-
 		if (roomId == currentRoom.id) addChatMessage(msg);
 		else messageNotify(msg);
 	});
@@ -331,7 +333,6 @@ function loadPage(userData) {
 		const room = chatRooms[data.room];
 		if (room) {
 			room.members = data.members;
-
 			if (room === currentRoom) setRoom(data.room);
 		}
 	});
