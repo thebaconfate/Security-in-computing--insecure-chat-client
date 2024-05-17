@@ -25,7 +25,6 @@ function connectToServer() {
 }
 
 function openDashboard(win, data) {
-	/* loads the chat window with data*/
 	win.loadFile("public/chat.html");
 }
 
@@ -54,9 +53,9 @@ ipcMain.on("login", function (event, data) {
 	const socket = connectToServer();
 	socket.emit("authenticate", data, (response) => {
 		if (response.success) {
-			userData = { username: data.username };
+			userData.username = data.username;
 			token = response.token;
-			openDashboard(BrowserWindow.getAllWindows()[0], userData);
+			openDashboard(BrowserWindow.getAllWindows()[0]);
 		} else {
 			dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
 				type: "warning",
@@ -116,6 +115,7 @@ ipcMain.on("get-user-data", function (event, arg) {
 	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
 	const socket = connectToServer();
 	socket.emit("get-user-data", { token: token }, (response) => {
+		console.log(response);
 		event.sender.send("user-data", response);
 	});
 });

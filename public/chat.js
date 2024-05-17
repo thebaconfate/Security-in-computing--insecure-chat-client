@@ -1,5 +1,6 @@
 const io = require("socket.io-client");
 const electron = require("electron");
+const ipcRender = electron.ipcRenderer;
 
 const SERVER = "localhost";
 const PORT = 3000;
