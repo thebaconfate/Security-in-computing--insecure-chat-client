@@ -5,6 +5,24 @@ const ipcRender = electron.ipcRenderer;
 const SERVER = "localhost";
 const PORT = 3000;
 
+function binarySearch(array, key, getProperty = undefined) {
+	let left = 0;
+	let right = array.length - 1;
+
+	while (left <= right) {
+		const mid = Math.floor((left + right) / 2);
+		const property = getProperty ? getProperty(array[mid]) : array[mid];
+		if (property === key) {
+			return array[mid];
+		} else if (property < key) {
+			left = mid + 1;
+		} else {
+			right = mid - 1;
+		}
+	}
+	return undefined;
+}
+
 $(function () {
 	// Get user data
 	electron.ipcRenderer.send("get-user-data");
@@ -29,8 +47,10 @@ function loadPage(userData) {
 	$usernameLabel.text(username);
 	let chatRooms = userData.chatRooms;
 	let users = {};
+	let currentRoom = false;
 	updateRoomList();
 	updateUsers(userData.directChats);
+	setRoom(chatRooms[0].ID);
 
 	// Connect to server
 	let connected = false;
@@ -72,6 +92,9 @@ function loadPage(userData) {
 		updateUserList();
 	}
 
+	/**
+	 * updates the user list in the UI
+	 */
 	function updateUserList() {
 		const $uta = $("#usersToAdd");
 		$uta.empty();
@@ -96,16 +119,28 @@ function loadPage(userData) {
 	///////////////
 	// Room List //
 	///////////////
+
+	/**
+	 *
+	 * @param {Array} p_rooms - a list of rooms considering of room.ID, room.name and room.private
+	 */
 	function updateRooms(p_rooms) {
 		chatRooms = p_rooms;
 		updateRoomList();
 	}
 
+	/**
+	 * @param {Object} room - a room object with room.ID, room.name and room.private
+	 */
 	function updateRoom(room) {
-		chatRooms[room.id] = room;
+		chatRooms[room.ID] = room;
 		updateRoomList();
 	}
 
+	/**
+	 *
+	 * @param {Number} id - the id of the room to remove
+	 */
 	function removeRoom(id) {
 		delete chatRooms[id];
 		updateRoomList();
@@ -128,9 +163,9 @@ function loadPage(userData) {
 
 		c.empty();
 		channels.forEach((r) => {
-			if (!chatRooms[r.id])
+			if (!chatRooms[r.ID])
 				c.append(`
-          <button type="button" class="list-group-item list-group-item-action" data-bs-dismiss="modal" onclick="joinChannel(${r.id})">${r.name}</button>
+          <button type="button" class="list-group-item list-group-item-action" data-bs-dismiss="modal" onclick="joinChannel(${r.ID})">${r.name}</button>
         `);
 		});
 	}
@@ -138,17 +173,16 @@ function loadPage(userData) {
 	//////////////
 	// Chatting //
 	//////////////
-
-	let currentRoom = false;
-
+	/**
+	 * @param {Number} id - the id of the room to set to.
+	 */
 	function setRoom(id) {
-		let oldRoom = currentRoom;
-
-		const room = chatRooms[id];
+		const room = binarySearch(chatRooms, id, (chatRoom) => chatRoom.ID);
+		console.log(room);
 		currentRoom = room;
 
 		$messages.empty();
-		room.history.forEach((m) => addChatMessage(m));
+		//room.history.forEach((m) => addChatMessage(m));
 
 		$userList.find("li").removeClass("active");
 		$roomList.find("li").removeClass("active");
@@ -162,14 +196,14 @@ function loadPage(userData) {
 				.find(`li[data-direct="${user}"]`)
 				.addClass("active")
 				.removeClass("unread")
-				.attr("data-room", room.id);
+				.attr("data-room", room.ID);
 		} else {
 			$("#channel-name").text("#" + room.name);
 			$("#channel-description").text(
-				`👤 ${room.members.length} | ${room.description}`
+				`👤 ${/*room.members.length*/ 1} | ${room.description}`
 			);
 			$roomList
-				.find(`li[data-room=${room.id}]`)
+				.find(`li[data-room=${room.ID}]`)
 				.addClass("active")
 				.removeClass("unread");
 		}
