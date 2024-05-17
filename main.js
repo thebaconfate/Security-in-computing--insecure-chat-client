@@ -115,7 +115,9 @@ ipcMain.on("get-user-data", function (event, arg) {
 	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
 	const socket = connectToServer();
 	socket.emit("get-user-data", { token: token }, (response) => {
-		console.log(response);
-		event.sender.send("user-data", response);
+		userData.chatRooms = response.chatRooms;
+		userData.directChats = response.directChats;
+		console.log(userData);
+		event.sender.send("user-data", userData);
 	});
 });

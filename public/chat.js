@@ -4,17 +4,18 @@ const ipcRender = electron.ipcRenderer;
 
 const SERVER = "localhost";
 const PORT = 3000;
+let directChats = {};
 
 $(function () {
 	// Get user data
 	electron.ipcRenderer.send("get-user-data");
 
 	electron.ipcRenderer.on("user-data", function (event, data) {
-		load(data);
+		loadPage(data);
 	});
 });
 
-function load(userData) {
+function loadPage(userData) {
 	console.log("Loading UI", userData);
 
 	// Initialize variables
@@ -26,9 +27,10 @@ function load(userData) {
 	const $userList = $("#user-list");
 
 	let username = userData.username;
-	let chatRooms = userData.chatRooms;
-	let directChats = userData.directChats;
 	$usernameLabel.text(username);
+	let chatRooms = userData.chatRooms || [];
+	updateRoomList();
+	directChats = userData.directChats;
 
 	// Connect to server
 	let connected = false;
@@ -48,6 +50,11 @@ function load(userData) {
 	///////////////
 	// User List //
 	///////////////
+
+	function unzip(list) {
+		let dict = {};
+		list.forEach((item) => (dict[item.username] = item.ID));
+	}
 
 	let users = {};
 
@@ -86,32 +93,29 @@ function load(userData) {
 	///////////////
 	// Room List //
 	///////////////
-
-	let rooms = [];
-
 	function updateRooms(p_rooms) {
-		rooms = p_rooms;
+		chatRooms = p_rooms;
 		updateRoomList();
 	}
 
 	function updateRoom(room) {
-		rooms[room.id] = room;
+		chatRooms[room.id] = room;
 		updateRoomList();
 	}
 
 	function removeRoom(id) {
-		delete rooms[id];
+		delete chatRooms[id];
 		updateRoomList();
 	}
 
 	function updateRoomList() {
 		$roomList.empty();
-		rooms.forEach((r) => {
-			if (!r.direct)
+		chatRooms.forEach((room) => {
+			if (!room.direct)
 				$roomList.append(`
-          <li onclick="setRoom(${r.id})"  data-room="${r.id}" class="${
-					r.private ? "private" : "public"
-				}">${r.name}</li>
+          <li onclick="setRoom(${room.ID})"  data-room="${room.ID}" class="${
+					room.private ? "private" : "public"
+				}">${room.name}</li>
         `);
 		});
 	}
@@ -121,7 +125,7 @@ function load(userData) {
 
 		c.empty();
 		channels.forEach((r) => {
-			if (!rooms[r.id])
+			if (!chatRooms[r.id])
 				c.append(`
           <button type="button" class="list-group-item list-group-item-action" data-bs-dismiss="modal" onclick="joinChannel(${r.id})">${r.name}</button>
         `);
@@ -137,7 +141,7 @@ function load(userData) {
 	function setRoom(id) {
 		let oldRoom = currentRoom;
 
-		const room = rooms[id];
+		const room = chatRooms[id];
 		currentRoom = room;
 
 		$messages.empty();
@@ -314,7 +318,7 @@ function load(userData) {
 	// Whenever the server emits 'new message', update the chat body
 	socket.on("new message", (msg) => {
 		const roomId = msg.room;
-		const room = rooms[roomId];
+		const room = chatRooms[roomId];
 		if (room) {
 			room.history.push(msg);
 		}
@@ -324,7 +328,7 @@ function load(userData) {
 	});
 
 	socket.on("update_user", (data) => {
-		const room = rooms[data.room];
+		const room = chatRooms[data.room];
 		if (room) {
 			room.members = data.members;
 
