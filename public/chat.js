@@ -1,6 +1,6 @@
 const io = require("socket.io-client");
 const electron = require("electron");
-const ipcRender = electron.ipcRenderer;
+const ipcRenderer = electron.ipcRenderer;
 
 const SERVER = "localhost";
 const PORT = 3000;
@@ -25,9 +25,9 @@ function binarySearch(array, key, getProperty = undefined) {
 
 $(function () {
 	// Get user data
-	electron.ipcRenderer.send("get-user-data");
+	ipcRenderer.send("get-user-data");
 
-	electron.ipcRenderer.on("user-data", function (event, data) {
+	ipcRenderer.on("user-data", function (event, data) {
 		loadPage(data);
 	});
 });
@@ -100,7 +100,7 @@ function loadPage(userData) {
 		$uta.empty();
 
 		$userList.empty();
-		for (let [_, user] of Object.entries(users)) {
+		for (let [, user] of Object.entries(users)) {
 			if (username !== user.username)
 				$userList.append(
 					`<li onclick="setDirectRoom(this)" data-direct="${
@@ -178,40 +178,41 @@ function loadPage(userData) {
 	 */
 	function setRoom(id) {
 		const room = binarySearch(chatRooms, id, (chatRoom) => chatRoom.ID);
-		console.log(room);
-		currentRoom = room;
+		ipcRenderer.send("get-room", room);
+		ipcRenderer.on("set-room", function (event, room) {
+			currentRoom = room;
+			$messages.empty();
+			room.history.forEach((m) => addChatMessage(m));
 
-		$messages.empty();
-		//room.history.forEach((m) => addChatMessage(m));
+			$userList.find("li").removeClass("active");
+			$roomList.find("li").removeClass("active");
 
-		$userList.find("li").removeClass("active");
-		$roomList.find("li").removeClass("active");
+			if (room.direct) {
+				const idx = room.members.indexOf(username) == 0 ? 1 : 0;
+				const user = room.members[idx];
+				setDirectRoomHeader(user);
 
-		if (room.direct) {
-			const idx = room.members.indexOf(username) == 0 ? 1 : 0;
-			const user = room.members[idx];
-			setDirectRoomHeader(user);
+				$userList
+					.find(`li[data-direct="${user}"]`)
+					.addClass("active")
+					.removeClass("unread")
+					.attr("data-room", room.ID);
+			} else {
+				$("#channel-name").text("#" + room.name);
+				$("#channel-description").text(
+					`👤 ${room.members} | ${room.description}`
+				);
+				$roomList
+					.find(`li[data-room=${room.ID}]`)
+					.addClass("active")
+					.removeClass("unread");
+			}
 
-			$userList
-				.find(`li[data-direct="${user}"]`)
-				.addClass("active")
-				.removeClass("unread")
-				.attr("data-room", room.ID);
-		} else {
-			$("#channel-name").text("#" + room.name);
-			$("#channel-description").text(
-				`👤 ${/*room.members.length*/ 1} | ${room.description}`
+			$(".roomAction").css(
+				"visibility",
+				room.direct || room.forceMembership ? "hidden" : "visible"
 			);
-			$roomList
-				.find(`li[data-room=${room.ID}]`)
-				.addClass("active")
-				.removeClass("unread");
-		}
-
-		$(".roomAction").css(
-			"visibility",
-			room.direct || room.forceMembership ? "hidden" : "visible"
-		);
+		});
 	}
 	window.setRoom = setRoom;
 
@@ -248,13 +249,13 @@ function loadPage(userData) {
 				room: currentRoom.id,
 			};
 
-			//addChatMessage(msg);
+			addChatMessage(msg);
 			socket.emit("new message", msg);
 		}
 	}
 
 	function addChatMessage(msg) {
-		let time = new Date(msg.time).toLocaleTimeString("en-US", {
+		let time = new Date(msg.timestamp).toLocaleTimeString("en-US", {
 			hour12: false,
 			hour: "numeric",
 			minute: "numeric",
@@ -266,7 +267,7 @@ function loadPage(userData) {
         <div class="message-textual">
           <span class="message-user">${msg.username}</span>
           <span class="message-time">${time}</span>
-          <span class="message-content">${msg.message}</span>
+          <span class="message-content">${msg.content}</span>
         </div>
       </div>
     `);

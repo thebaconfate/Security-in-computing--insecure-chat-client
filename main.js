@@ -121,3 +121,12 @@ ipcMain.on("get-user-data", function (event, arg) {
 		event.sender.send("user-data", userData);
 	});
 });
+
+ipcMain.on("get-room", function (event, data) {
+	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
+	const socket = connectToServer();
+	socket.emit("get-room", { token: token, room: data }, (response) => {
+		console.log(response);
+		event.sender.send("set-room", response);
+	});
+});
