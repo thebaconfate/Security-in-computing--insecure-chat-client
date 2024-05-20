@@ -115,10 +115,12 @@ ipcMain.on("get-user-data", function (event, arg) {
 	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
 	const socket = connectToServer();
 	socket.emit("get-user-data", { token: token }, (response) => {
-		userData.chatRooms = response.chatRooms;
-		userData.directChats = response.directChats;
-		console.log(userData);
-		event.sender.send("user-data", userData);
+		if (response.success) {
+			userData.chatRooms = response.data?.chatRooms;
+			userData.directChats = response.data?.directChats;
+			console.log(userData);
+			event.sender.send("user-data", userData);
+		}
 	});
 });
 
@@ -127,6 +129,25 @@ ipcMain.on("get-room", function (event, data) {
 	const socket = connectToServer();
 	socket.emit("get-room", { token: token, room: data }, (response) => {
 		console.log(response);
-		event.sender.send("set-room", response);
+		if (response.success) {
+			console.log(response);
+			event.sender.send("set-room", response.room);
+		}
 	});
+});
+
+ipcMain.on("send-message", function (event, data) {
+	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
+	const socket = connectToServer();
+	socket.emit(
+		"send-message",
+		{
+			token: token,
+			message: data,
+		},
+		(response) => {
+			console.log("message-sent", response);
+			event.sender.send("message-sent", response);
+		}
+	);
 });

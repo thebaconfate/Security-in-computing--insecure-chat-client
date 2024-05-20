@@ -53,7 +53,7 @@ function loadPage(userData) {
 	setRoom(chatRooms[0].ID);
 
 	// Connect to server
-	let connected = false;
+	let connected = true;
 	let socket = io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
 
 	let modalShowing = false;
@@ -71,8 +71,8 @@ function loadPage(userData) {
 	// User List //
 	///////////////
 	/**
-	 * updates the users list given a list of users
 	 * @param {Array} p_users - list of dictionaries with username and active as properties
+	 * This overrides the current user list with the new list
 	 */
 	function updateUsers(p_users) {
 		p_users.forEach((u) => (users[u.username] = u));
@@ -83,6 +83,7 @@ function loadPage(userData) {
 	 * updates a user in the user list
 	 * @param {string} username - the username of the user to update
 	 * @param {boolean} active - the new active state of the user
+	 * TODO: Make the server return if the user is active or not
 	 */
 	function updateUser(username, active) {
 		if (!users[username]) users[username] = { username: username };
@@ -94,6 +95,7 @@ function loadPage(userData) {
 
 	/**
 	 * updates the user list in the UI
+	 * TODO: Make the server return if the user is active or not SEE TODO ABOVE
 	 */
 	function updateUserList() {
 		const $uta = $("#usersToAdd");
@@ -122,7 +124,8 @@ function loadPage(userData) {
 
 	/**
 	 *
-	 * @param {Array} p_rooms - a list of rooms considering of room.ID, room.name and room.private
+	 * @param {Array} p_rooms - a list of rooms consisting of room.ID, room.name and room.private
+	 * This overrides the current room list with the new list
 	 */
 	function updateRooms(p_rooms) {
 		chatRooms = p_rooms;
@@ -131,21 +134,20 @@ function loadPage(userData) {
 
 	/**
 	 * @param {Object} room - a room object with room.ID, room.name and room.private
+	 * This updates a room in the room list given a room
 	 */
 	function updateRoom(room) {
 		chatRooms[room.ID] = room;
 		updateRoomList();
 	}
 
-	/**
-	 *
-	 * @param {Number} id - the id of the room to remove
-	 */
 	function removeRoom(id) {
 		delete chatRooms[id];
 		updateRoomList();
 	}
-
+	/**
+	 * updates the room list in the UI
+	 */
 	function updateRoomList() {
 		$roomList.empty();
 		chatRooms.forEach((room) => {
@@ -158,6 +160,7 @@ function loadPage(userData) {
 		});
 	}
 
+	// TODO: this is triggered when clicking on channels, letting the user join public channels, implement this
 	function updateChannels(channels) {
 		const c = $("#channelJoins");
 
@@ -187,6 +190,7 @@ function loadPage(userData) {
 			$userList.find("li").removeClass("active");
 			$roomList.find("li").removeClass("active");
 
+			// chatrooms and users seem to be the merged in the same list?
 			if (room.direct) {
 				const idx = room.members.indexOf(username) == 0 ? 1 : 0;
 				const user = room.members[idx];
@@ -208,6 +212,7 @@ function loadPage(userData) {
 					.removeClass("unread");
 			}
 
+			// this just adds CSS but figure out what this does
 			$(".roomAction").css(
 				"visibility",
 				room.direct || room.forceMembership ? "hidden" : "visible"
@@ -220,7 +225,7 @@ function loadPage(userData) {
 		$("#channel-name").text(user);
 		$("#channel-description").text(`Direct message with ${user}`);
 	}
-
+	// TODO: Swap socket to ipcMain communication
 	function setToDirectRoom(user) {
 		setDirectRoomHeader(user);
 		socket.emit("request_direct_room", { to: user });
@@ -237,23 +242,35 @@ function loadPage(userData) {
 		}
 	};
 
+	/**
+	 * Sends a message to the server and adds it to the UI
+	 */
 	function sendMessage() {
 		let message = $inputMessage.val();
-
+		console.log(`sending message ${message}`);
+		console.log(`connected: ${connected}, currentRoom: ${currentRoom}`);
 		if (message && connected && currentRoom !== false) {
 			$inputMessage.val("");
-
 			const msg = {
-				username: username,
-				message: message,
-				room: currentRoom.id,
+				content: message,
+				room: currentRoom.ID,
 			};
-
-			addChatMessage(msg);
-			socket.emit("new message", msg);
+			ipcRenderer.send("send-message", msg);
+			ipcRenderer.on("message-sent", (event, msg) => {
+				console.log("message-sent", msg);
+				if (
+					!binarySearch(currentRoom.history, msg.ID, (message) => message.ID)
+				) {
+					currentRoom.history.push(msg);
+					addChatMessage(msg);
+				}
+			});
 		}
 	}
-
+	/**
+	 *
+	 * @param {String} msg - adds a new message, called from sendMessage() and setRoom()
+	 */
 	function addChatMessage(msg) {
 		let time = new Date(msg.timestamp).toLocaleTimeString("en-US", {
 			hour12: false,
@@ -314,6 +331,8 @@ function loadPage(userData) {
 	/////////////////////
 
 	$window.on("keydown", (event) => {
+		console.log(modalShowing);
+		console.log(event.which);
 		if (modalShowing) return;
 
 		// Autofocus the current input when a key is typed
