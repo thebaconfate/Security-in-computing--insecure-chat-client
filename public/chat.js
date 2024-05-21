@@ -45,10 +45,10 @@ function loadPage(userData) {
 
 	let username = userData.username;
 	$usernameLabel.text(username);
-	let rooms = userData.rooms;
+	let rooms;
 	let users = {};
-	let currentRoom = false;
-	updateRoomList();
+	let currentRoom;
+	updateRooms(userData.rooms);
 	updateUsers(userData.users);
 	setRoom(rooms[0].ID);
 
