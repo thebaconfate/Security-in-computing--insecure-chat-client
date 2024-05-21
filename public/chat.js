@@ -45,12 +45,12 @@ function loadPage(userData) {
 
 	let username = userData.username;
 	$usernameLabel.text(username);
-	let chatRooms = userData.chatRooms;
+	let rooms = userData.rooms;
 	let users = {};
 	let currentRoom = false;
 	updateRoomList();
-	updateUsers(userData.directChats);
-	setRoom(chatRooms[0].ID);
+	updateUsers(userData.users);
+	setRoom(rooms[0].ID);
 
 	// Connect to server
 	let connected = true;
@@ -128,7 +128,7 @@ function loadPage(userData) {
 	 * This overrides the current room list with the new list
 	 */
 	function updateRooms(p_rooms) {
-		chatRooms = p_rooms;
+		rooms = p_rooms;
 		updateRoomList();
 	}
 
@@ -137,12 +137,12 @@ function loadPage(userData) {
 	 * This updates a room in the room list given a room
 	 */
 	function updateRoom(room) {
-		chatRooms[room.ID] = room;
+		rooms[room.ID] = room;
 		updateRoomList();
 	}
 
 	function removeRoom(id) {
-		delete chatRooms[id];
+		delete rooms[id];
 		updateRoomList();
 	}
 	/**
@@ -150,7 +150,7 @@ function loadPage(userData) {
 	 */
 	function updateRoomList() {
 		$roomList.empty();
-		chatRooms.forEach((room) => {
+		rooms.forEach((room) => {
 			if (!room.direct)
 				$roomList.append(`
           <li onclick="setRoom(${room.ID})"  data-room="${room.ID}" class="${
@@ -166,7 +166,7 @@ function loadPage(userData) {
 
 		c.empty();
 		channels.forEach((r) => {
-			if (!chatRooms[r.ID])
+			if (!rooms[r.ID])
 				c.append(`
           <button type="button" class="list-group-item list-group-item-action" data-bs-dismiss="modal" onclick="joinChannel(${r.ID})">${r.name}</button>
         `);
@@ -180,8 +180,8 @@ function loadPage(userData) {
 	 * @param {Number} id - the id of the room to set to.
 	 */
 	function setRoom(id) {
-		const room = binarySearch(chatRooms, id, (chatRoom) => chatRoom.ID);
-		ipcRenderer.send("get-room", room);
+		const room = binarySearch(rooms, id, (chatRoom) => chatRoom.ID);
+		ipcRenderer.send("get-room", room.ID);
 		ipcRenderer.on("set-room", function (event, room) {
 			currentRoom = room;
 			$messages.empty();
@@ -192,6 +192,7 @@ function loadPage(userData) {
 
 			// chatrooms and users seem to be the merged in the same list?
 			if (room.direct) {
+				console.log("HIT THE BREAKPOINT THAT NEVER HITS OMG");
 				const idx = room.members.indexOf(username) == 0 ? 1 : 0;
 				const user = room.members[idx];
 				setDirectRoomHeader(user);
@@ -222,19 +223,23 @@ function loadPage(userData) {
 	window.setRoom = setRoom;
 
 	function setDirectRoomHeader(user) {
+		console.log(`setting direct room header ${user}`);
 		$("#channel-name").text(user);
 		$("#channel-description").text(`Direct message with ${user}`);
 	}
 	// TODO: Swap socket to ipcMain communication
-	function setToDirectRoom(user) {
-		setDirectRoomHeader(user);
-		socket.emit("request_direct_room", { to: user });
+	function setToDirectRoom(username) {
+		const user = users[username];
+		ipcRenderer.send("request_direct_room", { to: user.ID });
+		ipcRenderer.on("requested_direct_room", (event, directRoom) => {
+			setDirectRoomHeader(username);
+		});
 	}
 
 	window.setDirectRoom = (el) => {
 		const user = el.getAttribute("data-direct");
 		const room = el.getAttribute("data-room");
-
+		console.log(`setting Direct Room ${user}, ${room}`);
 		if (room) {
 			setRoom(parseInt(room));
 		} else {
@@ -255,7 +260,7 @@ function loadPage(userData) {
 				content: message,
 				room: currentRoom.ID,
 			};
-			ipcRenderer.send("send-message", msg);
+			ipcRenderer.send("send-message", { message: msg });
 			ipcRenderer.on("message-sent", (event, msg) => {
 				console.log("message-sent", msg);
 				if (
@@ -355,19 +360,6 @@ function loadPage(userData) {
 	// server events //
 	///////////////////
 
-	// Whenever the server emits -login-, log the login message
-	socket.on("login", (data) => {
-		connected = true;
-
-		updateUsers(data.users);
-		updateRooms(data.rooms);
-		updateChannels(data.publicChannels);
-
-		if (data.rooms.length > 0) {
-			setRoom(data.rooms[0].id);
-		}
-	});
-
 	socket.on("update_public_channels", (data) => {
 		updateChannels(data.publicChannels);
 	});
@@ -375,7 +367,7 @@ function loadPage(userData) {
 	// Whenever the server emits 'new message', update the chat body
 	socket.on("new message", (msg) => {
 		const roomId = msg.room;
-		const room = chatRooms[roomId];
+		const room = rooms[roomId];
 		if (room) {
 			room.history.push(msg);
 		}
@@ -384,7 +376,7 @@ function loadPage(userData) {
 	});
 
 	socket.on("update_user", (data) => {
-		const room = chatRooms[data.room];
+		const room = rooms[data.room];
 		if (room) {
 			room.members = data.members;
 			if (room === currentRoom) setRoom(data.room);
@@ -392,7 +384,8 @@ function loadPage(userData) {
 	});
 
 	socket.on("user_state_change", (data) => {
-		updateUser(data.username, data.active);
+		console.log("user_state_change", data);
+		//updateUser(data.username, data.active);
 	});
 
 	socket.on("update_room", (data) => {
@@ -409,24 +402,8 @@ function loadPage(userData) {
 	// Connection //
 	////////////////
 
-	socket.on("connect", () => {
-		/*Calls this function to connect*/
-		console.log("connect");
-		// ! Calls join event on the server
-		socket.emit("join", { name: username, password: "chat" });
-	});
-
 	socket.on("disconnect", () => {
 		console.log("disconnect");
-	});
-
-	socket.on("reconnect", () => {
-		console.log("reconnect");
-
-		// join
-		// possibly to login as well?
-
-		socket.emit("join", (username, password));
 	});
 
 	socket.on("reconnect_error", () => {

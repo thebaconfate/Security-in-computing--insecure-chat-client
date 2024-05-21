@@ -11,6 +11,7 @@ let userData = {
 };
 
 let token;
+let socket;
 
 function openLogin(win) {
 	win.loadFile("public/login.html");
@@ -21,7 +22,9 @@ function openRegister(win) {
 }
 
 function connectToServer() {
-	return io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
+	if (!socket)
+		socket = io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
+	return socket;
 }
 
 function openDashboard(win, data) {
@@ -52,6 +55,7 @@ app.whenReady().then(() => {
 ipcMain.on("login", function (event, data) {
 	const socket = connectToServer();
 	socket.emit("authenticate", data, (response) => {
+		console.log(response);
 		if (response.success) {
 			userData.username = data.username;
 			token = response.token;
@@ -115,20 +119,21 @@ ipcMain.on("get-user-data", function (event, arg) {
 	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
 	const socket = connectToServer();
 	socket.emit("get-user-data", { token: token }, (response) => {
+		console.log("user-data", response);
 		if (response.success) {
-			userData.chatRooms = response.data?.chatRooms;
-			userData.directChats = response.data?.directChats;
+			userData.rooms = response.data?.rooms;
+			userData.users = response.data?.users;
 			console.log(userData);
 			event.sender.send("user-data", userData);
 		}
 	});
 });
 
-ipcMain.on("get-room", function (event, data) {
+ipcMain.on("get-room", function (event, room) {
 	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
 	const socket = connectToServer();
-	socket.emit("get-room", { token: token, room: data }, (response) => {
-		console.log(response);
+	socket.emit("get-room", { token: token, room: room }, (response) => {
+		console.log("get-room", response);
 		if (response.success) {
 			console.log(response);
 			event.sender.send("set-room", response.room);
@@ -139,15 +144,19 @@ ipcMain.on("get-room", function (event, data) {
 ipcMain.on("send-message", function (event, data) {
 	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
 	const socket = connectToServer();
-	socket.emit(
-		"send-message",
-		{
-			token: token,
-			message: data,
-		},
-		(response) => {
-			console.log("message-sent", response);
-			event.sender.send("message-sent", response);
-		}
-	);
+	data.token = token;
+	socket.emit("send-message", data, (response) => {
+		console.log("message-sent", response);
+		event.sender.send("message-sent", response);
+	});
+});
+
+ipcMain.on("request_direct_room", function (event, data) {
+	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
+	const socket = connectToServer();
+	data.token = token;
+	socket.emit("request_direct_room", data, (response) => {
+		console.log("requested direct room", response);
+		event.sender.send("requested_direct_room", response);
+	});
 });
