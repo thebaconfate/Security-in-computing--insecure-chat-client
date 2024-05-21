@@ -356,6 +356,12 @@ function loadPage(userData) {
 		}
 	});
 
+	ipcRenderer.on("new message", (event, message) => {
+		console.log("new message", message);
+		if (message.roomID === currentRoom.ID) addChatMessage(message);
+		else messageNotify(message);
+	});
+
 	///////////////////
 	// server events //
 	///////////////////
@@ -365,7 +371,7 @@ function loadPage(userData) {
 	});
 
 	// Whenever the server emits 'new message', update the chat body
-	socket.on("new message", (msg) => {
+	socket.on("new-message", (msg) => {
 		const roomId = msg.room;
 		const room = rooms[roomId];
 		if (room) {

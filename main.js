@@ -10,6 +10,7 @@ let userData = {
 	directChats: undefined,
 };
 
+let connected;
 let token;
 let socket;
 
@@ -22,8 +23,12 @@ function openRegister(win) {
 }
 
 function connectToServer() {
-	if (!socket)
+	console.log(`socket: ${socket}`);
+	if (!socket || !connected) {
 		socket = io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
+		connected = true;
+		initSocket(socket);
+	}
 	return socket;
 }
 
@@ -51,6 +56,18 @@ app.whenReady().then(() => {
 		if (BrowserWindow.getAllWindows().length === 0) createWindow();
 	});
 });
+
+function initSocket(socket) {
+	socket.on("new message", (message) => {
+		console.log("new message", message);
+		BrowserWindow.getFocusedWindow().webContents.send("new message", message);
+	});
+
+	socket.on("disconnect", () => {
+		console.log("disconnected");
+		connected = false;
+	});
+}
 
 ipcMain.on("login", function (event, data) {
 	const socket = connectToServer();
@@ -146,8 +163,16 @@ ipcMain.on("send-message", function (event, data) {
 	const socket = connectToServer();
 	data.token = token;
 	socket.emit("send-message", data, (response) => {
-		console.log("message-sent", response);
-		event.sender.send("message-sent", response);
+		console.log("send-message-response", response);
+		if (!response.success) {
+			dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
+				type: "warning",
+				buttons: ["Ok"],
+				title: "Failure",
+				normalizeAccessKeys: true,
+				message: response.reason || "Failed to send message",
+			});
+		}
 	});
 });
 
