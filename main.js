@@ -13,12 +13,13 @@ let userData = {
 let connected;
 let token;
 let socket;
+let win;
 
-function openLogin(win) {
+function openLogin() {
 	win.loadFile("public/login.html");
 }
 
-function openRegister(win) {
+function openRegister() {
 	win.loadFile("public/register.html");
 }
 
@@ -32,12 +33,12 @@ function connectToServer() {
 	return socket;
 }
 
-function openDashboard(win, data) {
+function openDashboard(data) {
 	win.loadFile("public/chat.html");
 }
 
 function createWindow() {
-	const win = new BrowserWindow({
+	win = new BrowserWindow({
 		width: 800,
 		height: 600,
 		webPreferences: {
@@ -46,7 +47,7 @@ function createWindow() {
 		},
 	});
 
-	openLogin(win);
+	openLogin();
 }
 
 app.whenReady().then(() => {
@@ -60,7 +61,7 @@ app.whenReady().then(() => {
 function initSocket(socket) {
 	socket.on("new message", (message) => {
 		console.log("new message", message);
-		BrowserWindow.getFocusedWindow().webContents.send("new message", message);
+		win.webContents.send("new message", message);
 	});
 
 	socket.on("disconnect", () => {
@@ -76,9 +77,9 @@ ipcMain.on("login", function (event, data) {
 		if (response.success) {
 			userData.username = data.username;
 			token = response.token;
-			openDashboard(BrowserWindow.getAllWindows()[0]);
+			openDashboard(win);
 		} else {
-			dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
+			dialog.showMessageBox(win, {
 				type: "warning",
 				buttons: ["Ok"],
 				title: "Failure",
@@ -90,11 +91,11 @@ ipcMain.on("login", function (event, data) {
 });
 
 ipcMain.on("nav-register", function (event, arg) {
-	openRegister(BrowserWindow.getAllWindows()[0]);
+	openRegister();
 });
 
 ipcMain.on("nav-login", function (event, arg) {
-	openLogin(BrowserWindow.getAllWindows()[0]);
+	openLogin();
 });
 
 ipcMain.on("register", function (event, data) {
@@ -103,7 +104,7 @@ ipcMain.on("register", function (event, data) {
 		socket.emit("register", data, (response) => {
 			console.log(response);
 			if (response.success) {
-				dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
+				dialog.showMessageBox(win, {
 					type: "info",
 					buttons: ["Ok"],
 					title: "Success",
@@ -112,7 +113,7 @@ ipcMain.on("register", function (event, data) {
 						"Registration successful!\nPlease login through the login page",
 				});
 			} else {
-				dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
+				dialog.showMessageBox(win, {
 					type: "warning",
 					buttons: ["Ok"],
 					title: "Failure",
@@ -122,7 +123,7 @@ ipcMain.on("register", function (event, data) {
 			}
 		});
 	} else {
-		dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
+		dialog.showMessageBox(win, {
 			type: "warning",
 			buttons: ["Ok"],
 			title: "Failure",
@@ -133,7 +134,7 @@ ipcMain.on("register", function (event, data) {
 });
 
 ipcMain.on("get-user-data", function (event, arg) {
-	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
+	if (!token) openLogin();
 	const socket = connectToServer();
 	socket.emit("get-user-data", { token: token }, (response) => {
 		console.log("user-data", response);
@@ -147,7 +148,7 @@ ipcMain.on("get-user-data", function (event, arg) {
 });
 
 ipcMain.on("get-room", function (event, room) {
-	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
+	if (!token) openLogin();
 	const socket = connectToServer();
 	socket.emit("get-room", { token: token, room: room }, (response) => {
 		console.log("get-room", response);
@@ -159,13 +160,13 @@ ipcMain.on("get-room", function (event, room) {
 });
 
 ipcMain.on("send-message", function (event, data) {
-	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
+	if (!token) openLogin();
 	const socket = connectToServer();
 	data.token = token;
 	socket.emit("send-message", data, (response) => {
 		console.log("send-message-response", response);
 		if (!response.success) {
-			dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
+			dialog.showMessageBox(win, {
 				type: "warning",
 				buttons: ["Ok"],
 				title: "Failure",
@@ -177,7 +178,7 @@ ipcMain.on("send-message", function (event, data) {
 });
 
 ipcMain.on("request_direct_room", function (event, data) {
-	if (!token) openLogin(BrowserWindow.getAllWindows()[0]);
+	if (!token) openLogin();
 	const socket = connectToServer();
 	data.token = token;
 	socket.emit("request_direct_room", data, (response) => {
