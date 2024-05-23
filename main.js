@@ -74,6 +74,10 @@ function initSocket(socket) {
 		console.log("update_public_channels", channels);
 		win.webContents.send("update_public_channels", channels);
 	});
+
+	socket.on("remove_room", (room) => {
+		win.webContents.send("remove_room", room);
+	});
 }
 
 ipcMain.on("login", function (event, data) {
@@ -214,4 +218,11 @@ ipcMain.on("add_user_to_channel", function (event, data) {
 	const socket = connectToServer();
 	data.token = token;
 	socket.emit("add_user_to_channel", data);
+});
+
+ipcMain.on("leave_channel", function (event, data) {
+	if (!token) openLogin();
+	const socket = connectToServer();
+	data.token = token;
+	socket.emit("leave_channel", data);
 });

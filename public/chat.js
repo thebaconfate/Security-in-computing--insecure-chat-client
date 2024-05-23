@@ -155,7 +155,7 @@ function loadPage(userData) {
 	}
 
 	function removeRoom(id) {
-		delete rooms[id];
+		rooms = rooms.filter((room) => room.ID !== id);
 		updateRoomList();
 	}
 	/**
@@ -343,8 +343,9 @@ function loadPage(userData) {
 	window.addToChannel = addToChannel;
 
 	function leaveChannel() {
-		socket.emit("leave_channel", { id: currentRoom.id });
+		ipcRenderer.send("leave_channel", { ID: currentRoom.ID });
 	}
+
 	window.leaveChannel = leaveChannel;
 
 	/////////////////////
@@ -386,6 +387,11 @@ function loadPage(userData) {
 	ipcRenderer.on("update_public_channels", (event, data) => {
 		updateChannels(data.publicChannels);
 	});
+
+	ipcRenderer.on("remove_room", (event, data) => {
+		removeRoom(data.room);
+		if (currentRoom.ID == data.room) setRoom(rooms[0].ID);
+	});
 	///////////////////
 	// server events //
 
@@ -400,10 +406,5 @@ function loadPage(userData) {
 	socket.on("user_state_change", (data) => {
 		console.log("user_state_change", data);
 		//updateUser(data.username, data.active);
-	});
-
-	socket.on("remove_room", (data) => {
-		removeRoom(data.room);
-		if (currentRoom.id == data.room) setRoom(0);
 	});
 }
