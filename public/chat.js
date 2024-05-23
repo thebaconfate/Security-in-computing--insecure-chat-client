@@ -23,6 +23,17 @@ function binarySearch(array, key, getProperty = undefined) {
 	return undefined;
 }
 
+function binaryInsert(array, key, getProperty = undefined) {
+	const index = array.findIndex((element) => {
+		getProperty ? getProperty(element) > key : element > key;
+	});
+	if (index === -1) {
+		array.push(key);
+	} else {
+		array.splice(index, 0, key);
+	}
+}
+
 $(function () {
 	// Get user data
 	ipcRenderer.send("get-user-data");
@@ -137,7 +148,7 @@ function loadPage(userData) {
 	 * This updates a room in the room list given a room
 	 */
 	function updateRoom(room) {
-		rooms[room.ID] = room;
+		binaryInsert(rooms, room, (r) => r.ID);
 		updateRoomList();
 	}
 
@@ -180,6 +191,7 @@ function loadPage(userData) {
 	 * @param {Number} id - the id of the room to set to.
 	 */
 	function setRoom(id) {
+		console.log("setroom", rooms);
 		const room = binarySearch(rooms, id, (chatRoom) => chatRoom.ID);
 		ipcRenderer.send("get-room", room.ID);
 		ipcRenderer.on("set-room", function (event, room) {
@@ -227,13 +239,10 @@ function loadPage(userData) {
 		$("#channel-name").text(user);
 		$("#channel-description").text(`Direct message with ${user}`);
 	}
-	// TODO: Swap socket to ipcMain communication
+
 	function setToDirectRoom(username) {
 		const user = users[username];
 		ipcRenderer.send("request_direct_room", { to: user.ID });
-		ipcRenderer.on("requested_direct_room", (event, directRoom) => {
-			setDirectRoomHeader(username);
-		});
 	}
 
 	window.setDirectRoom = (el) => {
@@ -308,12 +317,13 @@ function loadPage(userData) {
 		const description = $("#inp-channel-description").val();
 		const private_ = $("#inp-private").is(":checked");
 
-		socket.emit("add_channel", {
+		ipcRenderer.send("add-channel", {
 			name: name,
 			description: description,
 			private: private_,
 		});
 	}
+
 	window.addChannel = addChannel;
 
 	function joinChannel(id) {
@@ -362,23 +372,20 @@ function loadPage(userData) {
 		else messageNotify(message);
 	});
 
+	ipcRenderer.on("update_room", (event, data) => {
+		const username = Object.values(users).find(
+			(values) => values.ID === data.otherUser
+		).username;
+		setDirectRoomHeader(username);
+		updateRoom(data.room);
+		if (data.moveto) setRoom(data.room.ID);
+	});
 	///////////////////
 	// server events //
 	///////////////////
 
 	socket.on("update_public_channels", (data) => {
 		updateChannels(data.publicChannels);
-	});
-
-	// Whenever the server emits 'new message', update the chat body
-	socket.on("new-message", (msg) => {
-		const roomId = msg.room;
-		const room = rooms[roomId];
-		if (room) {
-			room.history.push(msg);
-		}
-		if (roomId == currentRoom.id) addChatMessage(msg);
-		else messageNotify(msg);
 	});
 
 	socket.on("update_user", (data) => {
@@ -394,25 +401,8 @@ function loadPage(userData) {
 		//updateUser(data.username, data.active);
 	});
 
-	socket.on("update_room", (data) => {
-		updateRoom(data.room);
-		if (data.moveto) setRoom(data.room.id);
-	});
-
 	socket.on("remove_room", (data) => {
 		removeRoom(data.room);
 		if (currentRoom.id == data.room) setRoom(0);
-	});
-
-	////////////////
-	// Connection //
-	////////////////
-
-	socket.on("disconnect", () => {
-		console.log("disconnect");
-	});
-
-	socket.on("reconnect_error", () => {
-		console.log("reconnect_error");
 	});
 }

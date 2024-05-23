@@ -6,8 +6,6 @@ const PORT = 3000;
 
 let userData = {
 	username: undefined,
-	chatRooms: undefined,
-	directChats: undefined,
 };
 
 let connected;
@@ -24,7 +22,6 @@ function openRegister() {
 }
 
 function connectToServer() {
-	console.log(`socket: ${socket}`);
 	if (!socket || !connected) {
 		socket = io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
 		connected = true;
@@ -60,13 +57,16 @@ app.whenReady().then(() => {
 
 function initSocket(socket) {
 	socket.on("new message", (message) => {
-		console.log("new message", message);
 		win.webContents.send("new message", message);
 	});
 
 	socket.on("disconnect", () => {
 		console.log("disconnected");
 		connected = false;
+	});
+
+	socket.on("update_room", (room) => {
+		win.webContents.send("update_room", room);
 	});
 }
 
@@ -185,4 +185,11 @@ ipcMain.on("request_direct_room", function (event, data) {
 		console.log("requested direct room", response);
 		event.sender.send("requested_direct_room", response);
 	});
+});
+
+ipcMain.on("add_channel", function (event, data) {
+	if (!token) openLogin();
+	const socket = connectToServer();
+	data.token = token;
+	socket.emit("add_channel", data);
 });
