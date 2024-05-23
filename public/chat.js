@@ -61,9 +61,8 @@ function loadPage(userData) {
 	let currentRoom;
 	updateRooms(userData.rooms);
 	updateUsers(userData.users);
-	console.log(userData.publicChannels);
 	updateChannels(userData.publicChannels);
-	if (userData.rooms > 0) setRoom(rooms[0].ID);
+	if (rooms.length > 0) setRoom(rooms[0].ID);
 
 	// Connect to server
 	let connected = true;
@@ -312,7 +311,7 @@ function loadPage(userData) {
 	function messageNotify(msg) {
 		if (msg.direct)
 			$userList.find(`li[data-direct="${msg.username}"]`).addClass("unread");
-		else $roomList.find(`li[data-room=${msg.room}]`).addClass("unread");
+		else $roomList.find(`li[data-room=${msg.roomID}]`).addClass("unread");
 	}
 
 	function addChannel() {
@@ -336,7 +335,10 @@ function loadPage(userData) {
 	window.joinChannel = joinChannel;
 
 	function addToChannel(user) {
-		socket.emit("add_user_to_channel", { channel: currentRoom.id, user: user });
+		ipcRenderer.send("add_user_to_channel", {
+			channel: currentRoom.ID,
+			user: user,
+		});
 	}
 	window.addToChannel = addToChannel;
 

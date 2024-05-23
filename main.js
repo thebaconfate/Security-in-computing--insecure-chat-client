@@ -57,6 +57,7 @@ app.whenReady().then(() => {
 
 function initSocket(socket) {
 	socket.on("new message", (message) => {
+		console.log("new message", message);
 		win.webContents.send("new message", message);
 	});
 
@@ -206,4 +207,11 @@ ipcMain.on("join_channel", function (event, data) {
 	const socket = connectToServer();
 	data.token = token;
 	socket.emit("join_channel", data);
+});
+
+ipcMain.on("add_user_to_channel", function (event, data) {
+	if (!token) openLogin();
+	const socket = connectToServer();
+	data.token = token;
+	socket.emit("add_user_to_channel", data);
 });
