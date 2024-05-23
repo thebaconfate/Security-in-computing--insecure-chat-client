@@ -20,7 +20,7 @@ function binarySearch(array, key, getProperty = undefined) {
 			right = mid - 1;
 		}
 	}
-	return undefined;
+	return false;
 }
 
 function binaryInsert(array, key, getProperty = undefined) {
@@ -61,7 +61,9 @@ function loadPage(userData) {
 	let currentRoom;
 	updateRooms(userData.rooms);
 	updateUsers(userData.users);
-	setRoom(rooms[0].ID);
+	console.log(userData.publicChannels);
+	updateChannels(userData.publicChannels);
+	if (userData.rooms > 0) setRoom(rooms[0].ID);
 
 	// Connect to server
 	let connected = true;
@@ -148,7 +150,8 @@ function loadPage(userData) {
 	 * This updates a room in the room list given a room
 	 */
 	function updateRoom(room) {
-		binaryInsert(rooms, room, (r) => r.ID);
+		rooms.push(room);
+		rooms.sort((a, b) => a.ID - b.ID);
 		updateRoomList();
 	}
 
@@ -177,7 +180,7 @@ function loadPage(userData) {
 
 		c.empty();
 		channels.forEach((r) => {
-			if (!rooms[r.ID])
+			if (!binarySearch(rooms, r.ID, (room) => room.ID))
 				c.append(`
           <button type="button" class="list-group-item list-group-item-action" data-bs-dismiss="modal" onclick="joinChannel(${r.ID})">${r.name}</button>
         `);
@@ -327,8 +330,9 @@ function loadPage(userData) {
 	window.addChannel = addChannel;
 
 	function joinChannel(id) {
-		socket.emit("join_channel", { id: id });
+		ipcRenderer.send("join_channel", { ID: id });
 	}
+
 	window.joinChannel = joinChannel;
 
 	function addToChannel(user) {
@@ -376,13 +380,12 @@ function loadPage(userData) {
 		updateRoom(data.room);
 		if (data.moveto) setRoom(data.room.ID);
 	});
-	///////////////////
-	// server events //
-	///////////////////
 
-	socket.on("update_public_channels", (data) => {
+	ipcRenderer.on("update_public_channels", (event, data) => {
 		updateChannels(data.publicChannels);
 	});
+	///////////////////
+	// server events //
 
 	socket.on("update_user", (data) => {
 		const room = rooms[data.room];
