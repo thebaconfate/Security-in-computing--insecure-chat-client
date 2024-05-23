@@ -57,7 +57,6 @@ app.whenReady().then(() => {
 
 function initSocket(socket) {
 	socket.on("new message", (message) => {
-		console.log("new message", message);
 		win.webContents.send("new message", message);
 	});
 
@@ -71,7 +70,6 @@ function initSocket(socket) {
 	});
 
 	socket.on("update_public_channels", (channels) => {
-		console.log("update_public_channels", channels);
 		win.webContents.send("update_public_channels", channels);
 	});
 
@@ -80,15 +78,16 @@ function initSocket(socket) {
 	});
 
 	socket.on("update_user", (data) => {
-		console.log("update_user", data);
 		win.webContents.send("update_user", data);
+	});
+	socket.on("user_state_change", (data) => {
+		win.webContents.send("user_state_change", data);
 	});
 }
 
 ipcMain.on("login", function (event, data) {
 	const socket = connectToServer();
 	socket.emit("authenticate", data, (response) => {
-		console.log(response);
 		if (response.success) {
 			userData.username = data.username;
 			token = response.token;
@@ -117,7 +116,6 @@ ipcMain.on("register", function (event, data) {
 	if (data.username && data.password) {
 		let socket = connectToServer();
 		socket.emit("register", data, (response) => {
-			console.log(response);
 			if (response.success) {
 				dialog.showMessageBox(win, {
 					type: "info",
@@ -152,12 +150,10 @@ ipcMain.on("get-user-data", function (event, arg) {
 	if (!token) openLogin();
 	const socket = connectToServer();
 	socket.emit("get-user-data", { token: token }, (response) => {
-		console.log("user-data", response);
 		if (response.success) {
 			userData.rooms = response.data?.rooms;
 			userData.users = response.data?.users;
 			userData.publicChannels = response.data?.publicChannels;
-			console.log(userData);
 			event.sender.send("user-data", userData);
 		}
 	});
@@ -167,9 +163,7 @@ ipcMain.on("get-room", function (event, room) {
 	if (!token) openLogin();
 	const socket = connectToServer();
 	socket.emit("get-room", { token: token, room: room }, (response) => {
-		console.log("get-room", response);
 		if (response.success) {
-			console.log(response);
 			event.sender.send("set-room", response.room);
 		}
 	});
@@ -180,7 +174,6 @@ ipcMain.on("send-message", function (event, data) {
 	const socket = connectToServer();
 	data.token = token;
 	socket.emit("send-message", data, (response) => {
-		console.log("send-message-response", response);
 		if (!response.success) {
 			dialog.showMessageBox(win, {
 				type: "warning",
@@ -198,13 +191,11 @@ ipcMain.on("request_direct_room", function (event, data) {
 	const socket = connectToServer();
 	data.token = token;
 	socket.emit("request_direct_room", data, (response) => {
-		console.log("requested direct room", response);
 		event.sender.send("requested_direct_room", response);
 	});
 });
 
 ipcMain.on("add_channel", function (event, data) {
-	console.log("add_channel", data);
 	if (!token) openLogin();
 	const socket = connectToServer();
 	data.token = token;

@@ -44,8 +44,6 @@ $(function () {
 });
 
 function loadPage(userData) {
-	console.log("Loading UI", userData);
-
 	// Initialize variables
 	const $window = $(window);
 	const $messages = $(".messages"); // Messages area
@@ -75,7 +73,6 @@ function loadPage(userData) {
 			modalShowing = false;
 		})
 		.on("show.bs.modal", () => {
-			console.log("show");
 			modalShowing = true;
 		});
 
@@ -196,7 +193,6 @@ function loadPage(userData) {
 	 * @param {Number} id - the id of the room to set to.
 	 */
 	function setRoom(id) {
-		console.log("setroom", rooms);
 		const room = binarySearch(rooms, id, (chatRoom) => chatRoom.ID);
 		ipcRenderer.send("get-room", room.ID);
 		ipcRenderer.on("set-room", function (event, room) {
@@ -244,7 +240,6 @@ function loadPage(userData) {
 	 * @param {String} user - the username of the user to set the direct room header to
 	 */
 	function setDirectRoomHeader(user) {
-		console.log(`setting direct room header ${user}`);
 		$("#channel-name").text(user);
 		$("#channel-description").text(`Direct message with ${user}`);
 	}
@@ -261,7 +256,6 @@ function loadPage(userData) {
 	window.setDirectRoom = (el) => {
 		const user = el.getAttribute("data-direct");
 		const room = el.getAttribute("data-room");
-		console.log(`setting Direct Room ${user}, ${room}`);
 		if (room) {
 			setRoom(parseInt(room));
 		} else {
@@ -274,8 +268,6 @@ function loadPage(userData) {
 	 */
 	function sendMessage() {
 		let message = $inputMessage.val();
-		console.log(`sending message ${message}`);
-		console.log(`connected: ${connected}, currentRoom: ${currentRoom}`);
 		if (message && connected && currentRoom !== false) {
 			$inputMessage.val("");
 			const msg = {
@@ -284,7 +276,6 @@ function loadPage(userData) {
 			};
 			ipcRenderer.send("send-message", { message: msg });
 			ipcRenderer.on("message-sent", (event, msg) => {
-				console.log("message-sent", msg);
 				if (
 					!binarySearch(currentRoom.history, msg.ID, (message) => message.ID)
 				) {
@@ -403,7 +394,6 @@ function loadPage(userData) {
 	});
 
 	ipcRenderer.on("new message", (event, message) => {
-		console.log("new message", message);
 		if (message.roomID === currentRoom.ID) addChatMessage(message);
 		else messageNotify(message);
 	});
@@ -429,11 +419,10 @@ function loadPage(userData) {
 			if (room === currentRoom) setRoom(data.room);
 		}
 	});
+
+	ipcRenderer.on("user_state_change", (event, data) => {
+		updateUser(data.username, data.active);
+	});
 	///////////////////
 	// server events //
-
-	socket.on("user_state_change", (data) => {
-		console.log("user_state_change", data);
-		//updateUser(data.username, data.active);
-	});
 }
