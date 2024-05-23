@@ -78,6 +78,11 @@ function initSocket(socket) {
 	socket.on("remove_room", (room) => {
 		win.webContents.send("remove_room", room);
 	});
+
+	socket.on("update_user", (data) => {
+		console.log("update_user", data);
+		win.webContents.send("update_user", data);
+	});
 }
 
 ipcMain.on("login", function (event, data) {

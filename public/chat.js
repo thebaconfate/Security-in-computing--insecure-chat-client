@@ -173,7 +173,10 @@ function loadPage(userData) {
 		});
 	}
 
-	// TODO: this is triggered when clicking on channels, letting the user join public channels, implement this
+	/**
+	 *
+	 * @param {Array[Object]} channels - a list of public channels
+	 */
 	function updateChannels(channels) {
 		const c = $("#channelJoins");
 
@@ -236,12 +239,20 @@ function loadPage(userData) {
 	}
 	window.setRoom = setRoom;
 
+	/**
+	 *
+	 * @param {String} user - the username of the user to set the direct room header to
+	 */
 	function setDirectRoomHeader(user) {
 		console.log(`setting direct room header ${user}`);
 		$("#channel-name").text(user);
 		$("#channel-description").text(`Direct message with ${user}`);
 	}
 
+	/**
+	 *
+	 * @param {String} username - the username of the user to set the direct room to
+	 */
 	function setToDirectRoom(username) {
 		const user = users[username];
 		ipcRenderer.send("request_direct_room", { to: user.ID });
@@ -308,12 +319,19 @@ function loadPage(userData) {
 		$messages[0].scrollTop = $messages[0].scrollHeight;
 	}
 
+	/**
+	 *
+	 * @param {Object} msg - a message object with the properties msg.username, msg.roomID and msg.direct
+	 */
 	function messageNotify(msg) {
 		if (msg.direct)
 			$userList.find(`li[data-direct="${msg.username}"]`).addClass("unread");
 		else $roomList.find(`li[data-room=${msg.roomID}]`).addClass("unread");
 	}
 
+	/**
+	 * Creates a new channel
+	 */
 	function addChannel() {
 		const name = $("#inp-channel-name").val();
 		const description = $("#inp-channel-description").val();
@@ -328,12 +346,20 @@ function loadPage(userData) {
 
 	window.addChannel = addChannel;
 
+	/**
+	 *
+	 * @param {number} id - the id of the channel to join
+	 */
 	function joinChannel(id) {
 		ipcRenderer.send("join_channel", { ID: id });
 	}
 
 	window.joinChannel = joinChannel;
 
+	/**
+	 *
+	 * @param {string} user the username of the user to add to the channel
+	 */
 	function addToChannel(user) {
 		ipcRenderer.send("add_user_to_channel", {
 			channel: currentRoom.ID,
@@ -342,6 +368,9 @@ function loadPage(userData) {
 	}
 	window.addToChannel = addToChannel;
 
+	/**
+	 * Leaves the current channel
+	 */
 	function leaveChannel() {
 		ipcRenderer.send("leave_channel", { ID: currentRoom.ID });
 	}
@@ -392,16 +421,16 @@ function loadPage(userData) {
 		removeRoom(data.room);
 		if (currentRoom.ID == data.room) setRoom(rooms[0].ID);
 	});
-	///////////////////
-	// server events //
 
-	socket.on("update_user", (data) => {
-		const room = rooms[data.room];
+	ipcRenderer.on("update_user", (event, data) => {
+		const room = binarySearch(rooms, data.room, (room) => room.ID);
 		if (room) {
 			room.members = data.members;
 			if (room === currentRoom) setRoom(data.room);
 		}
 	});
+	///////////////////
+	// server events //
 
 	socket.on("user_state_change", (data) => {
 		console.log("user_state_change", data);
