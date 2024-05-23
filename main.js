@@ -188,6 +188,7 @@ ipcMain.on("request_direct_room", function (event, data) {
 });
 
 ipcMain.on("add_channel", function (event, data) {
+	console.log("add_channel", data);
 	if (!token) openLogin();
 	const socket = connectToServer();
 	data.token = token;

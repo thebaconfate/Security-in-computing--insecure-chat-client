@@ -217,7 +217,7 @@ function loadPage(userData) {
 			} else {
 				$("#channel-name").text("#" + room.name);
 				$("#channel-description").text(
-					`👤 ${room.members} | ${room.description}`
+					`👤 ${room.members.length} | ${room.description}`
 				);
 				$roomList
 					.find(`li[data-room=${room.ID}]`)
@@ -317,7 +317,7 @@ function loadPage(userData) {
 		const description = $("#inp-channel-description").val();
 		const private_ = $("#inp-private").is(":checked");
 
-		ipcRenderer.send("add-channel", {
+		ipcRenderer.send("add_channel", {
 			name: name,
 			description: description,
 			private: private_,
@@ -373,10 +373,6 @@ function loadPage(userData) {
 	});
 
 	ipcRenderer.on("update_room", (event, data) => {
-		const username = Object.values(users).find(
-			(values) => values.ID === data.otherUser
-		).username;
-		setDirectRoomHeader(username);
 		updateRoom(data.room);
 		if (data.moveto) setRoom(data.room.ID);
 	});
