@@ -1,8 +1,10 @@
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("node:path");
 const io = require("socket.io-client");
+const fs = require("fs");
 const SERVER = "localhost";
 const PORT = 3000;
+const crypto = require("crypto");
 
 let userData = {
 	username: undefined,
@@ -12,6 +14,13 @@ let connected;
 let token;
 let socket;
 let win;
+let publicKey;
+
+function getPrivateKey() {
+	if (userData.username)
+		return fs.readFileSync(`${userData.username}_private_key.pem`, "utf-8");
+	return null;
+}
 
 function openLogin() {
 	win.loadFile("public/login.html");
@@ -91,6 +100,7 @@ ipcMain.on("login", function (event, data) {
 		if (response.success) {
 			userData.username = data.username;
 			token = response.token;
+			publicKey = response.publicKey;
 			openDashboard(win);
 		} else {
 			dialog.showMessageBox(win, {
@@ -115,6 +125,18 @@ ipcMain.on("nav-login", function (event, arg) {
 ipcMain.on("register", function (event, data) {
 	if (data.username && data.password) {
 		let socket = connectToServer();
+		const keyPair = crypto.generateKeyPairSync("rsa", {
+			modulusLength: 2048,
+			publicKeyEncoding: {
+				type: "spki",
+				format: "pem",
+			},
+			privateKeyEncoding: {
+				type: "pkcs8",
+				format: "pem",
+			},
+		});
+		data.publicKey = keyPair.publicKey;
 		socket.emit("register", data, (response) => {
 			if (response.success) {
 				dialog.showMessageBox(win, {
@@ -125,6 +147,10 @@ ipcMain.on("register", function (event, data) {
 					message:
 						"Registration successful!\nPlease login through the login page",
 				});
+				fs.writeFileSync(
+					`${data.username}_private_key.pem`,
+					keyPair.privateKey
+				);
 			} else {
 				dialog.showMessageBox(win, {
 					type: "warning",

@@ -43,6 +43,7 @@ $(function () {
 	});
 });
 
+// TODO: refactor, possible memory leak due to event emitters
 function loadPage(userData) {
 	// Initialize variables
 	const $window = $(window);
@@ -92,7 +93,7 @@ function loadPage(userData) {
 	 * updates a user in the user list
 	 * @param {string} username - the username of the user to update
 	 * @param {boolean} active - the new active state of the user
-	 * TODO: Make the server return if the user is active or not
+	 * 
 	 */
 	function updateUser(username, active) {
 		if (!users[username]) users[username] = { username: username };
@@ -275,14 +276,6 @@ function loadPage(userData) {
 				room: currentRoom.ID,
 			};
 			ipcRenderer.send("send-message", { message: msg });
-			ipcRenderer.on("message-sent", (event, msg) => {
-				if (
-					!binarySearch(currentRoom.history, msg.ID, (message) => message.ID)
-				) {
-					currentRoom.history.push(msg);
-					addChatMessage(msg);
-				}
-			});
 		}
 	}
 	/**
@@ -422,6 +415,13 @@ function loadPage(userData) {
 
 	ipcRenderer.on("user_state_change", (event, data) => {
 		updateUser(data.username, data.active);
+	});
+
+	ipcRenderer.on("message-sent", (event, msg) => {
+		if (!binarySearch(currentRoom.history, msg.ID, (message) => message.ID)) {
+			currentRoom.history.push(msg);
+			addChatMessage(msg);
+		}
 	});
 	///////////////////
 	// server events //
