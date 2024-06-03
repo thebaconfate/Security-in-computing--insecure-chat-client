@@ -196,43 +196,6 @@ function loadPage(userData) {
 	function setRoom(id) {
 		const room = binarySearch(rooms, id, (chatRoom) => chatRoom.ID);
 		ipcRenderer.send("get-room", room.ID);
-		ipcRenderer.on("set-room", function (event, room) {
-			currentRoom = room;
-			$messages.empty();
-			room.history.forEach((m) => addChatMessage(m));
-
-			$userList.find("li").removeClass("active");
-			$roomList.find("li").removeClass("active");
-
-			// chatrooms and users seem to be the merged in the same list?
-			if (room.direct) {
-				console.log("HIT THE BREAKPOINT THAT NEVER HITS OMG");
-				const idx = room.members.indexOf(username) == 0 ? 1 : 0;
-				const user = room.members[idx];
-				setDirectRoomHeader(user);
-
-				$userList
-					.find(`li[data-direct="${user}"]`)
-					.addClass("active")
-					.removeClass("unread")
-					.attr("data-room", room.ID);
-			} else {
-				$("#channel-name").text("#" + room.name);
-				$("#channel-description").text(
-					`👤 ${room.members.length} | ${room.description}`
-				);
-				$roomList
-					.find(`li[data-room=${room.ID}]`)
-					.addClass("active")
-					.removeClass("unread");
-			}
-
-			// this just adds CSS but figure out what this does
-			$(".roomAction").css(
-				"visibility",
-				room.direct || room.forceMembership ? "hidden" : "visible"
-			);
-		});
 	}
 	window.setRoom = setRoom;
 
@@ -422,6 +385,43 @@ function loadPage(userData) {
 			currentRoom.history.push(msg);
 			addChatMessage(msg);
 		}
+	});
+
+	ipcRenderer.on("set-room", function (event, room) {
+		currentRoom = room;
+		$messages.empty();
+		room.history.forEach((m) => addChatMessage(m));
+
+		$userList.find("li").removeClass("active");
+		$roomList.find("li").removeClass("active");
+
+		// chatrooms and users seem to be the merged in the same list?
+		if (room.direct) {
+			const idx = room.members.indexOf(username) == 0 ? 1 : 0;
+			const user = room.members[idx];
+			setDirectRoomHeader(user);
+
+			$userList
+				.find(`li[data-direct="${user}"]`)
+				.addClass("active")
+				.removeClass("unread")
+				.attr("data-room", room.ID);
+		} else {
+			$("#channel-name").text("#" + room.name);
+			$("#channel-description").text(
+				`👤 ${room.members.length} | ${room.description}`
+			);
+			$roomList
+				.find(`li[data-room=${room.ID}]`)
+				.addClass("active")
+				.removeClass("unread");
+		}
+
+		// this just adds CSS but figure out what this does
+		$(".roomAction").css(
+			"visibility",
+			room.direct || room.forceMembership ? "hidden" : "visible"
+		);
 	});
 	///////////////////
 	// server events //

@@ -14,12 +14,59 @@ let connected;
 let token;
 let socket;
 let win;
-let publicKey;
+let currentRoomMembers = [];
+
+function saveCurrentRoomMembers(members) {
+	currentRoomMembers = members;
+}
 
 function getPrivateKey() {
 	if (userData.username)
 		return fs.readFileSync(`${userData.username}_private_key.pem`, "utf-8");
 	return null;
+}
+
+function encryptMessage(message, aesKey) {
+	const iv = crypto.randomBytes(16);
+	const cipher = crypto.createCipheriv("aes-256-cbc", aesKey, iv);
+	let encrypted = cipher.update(message, "utf8", "hex");
+	encrypted += cipher.final("hex");
+	return Buffer.concat([iv, Buffer.from(encrypted, "hex")]);
+}
+
+function decryptMessage(encrypted, aesKey) {
+	const iv = encrypted.subarray(0, 16);
+	encrypted = encrypted.subarray(16);
+	const decipher = crypto.createDecipheriv("aes-256-cbc", aesKey, iv);
+	let decrypted = decipher.update(encrypted, "hex", "utf8");
+	decrypted += decipher.final("utf8");
+	return decrypted;
+}
+
+function generateAesKey() {
+	return crypto.randomBytes(32);
+}
+
+function encryptAesKey(aesKey, members) {
+	console.log("members", members);
+	return members.map((member) => {
+		console.log("userData", userData);
+		const user =
+			userData.users.find((user) => user.username === member) || userData;
+		return {
+			ID: user.ID,
+			key: crypto.publicEncrypt(user.publicKey, aesKey),
+		};
+	});
+}
+
+function decryptAesKey(encryptedAesKey, privateKey) {
+	return crypto.privateDecrypt(privateKey, encryptedAesKey);
+}
+
+function isDirectOrPrivate(roomID) {
+	const room = userData.rooms.find((room) => room.ID === roomID);
+	return room == undefined || room.private;
 }
 
 function openLogin() {
@@ -66,6 +113,20 @@ app.whenReady().then(() => {
 
 function initSocket(socket) {
 	socket.on("new message", (message) => {
+		console.log("new message", message);
+
+		const decryptionKeys = message.decryptionKeys;
+		if (decryptionKeys) {
+			const decryptionKey = decryptionKeys.find(
+				(key) => key.ID === userData.ID
+			);
+			if (decryptionKey) {
+				const aesKey = decryptAesKey(decryptionKey.key, getPrivateKey());
+				message.content = decryptMessage(message.content, aesKey);
+			}
+		} else {
+			message.content = message.content.toString("utf-8");
+		}
 		win.webContents.send("new message", message);
 	});
 
@@ -75,6 +136,7 @@ function initSocket(socket) {
 	});
 
 	socket.on("update_room", (room) => {
+		console.log("update_room", room);
 		win.webContents.send("update_room", room);
 	});
 
@@ -99,8 +161,10 @@ ipcMain.on("login", function (event, data) {
 	socket.emit("authenticate", data, (response) => {
 		if (response.success) {
 			userData.username = data.username;
+			console.log("response", response);
+			userData.ID = response.ID;
 			token = response.token;
-			publicKey = response.publicKey;
+			userData.publicKey = response.publicKey;
 			openDashboard(win);
 		} else {
 			dialog.showMessageBox(win, {
@@ -148,7 +212,7 @@ ipcMain.on("register", function (event, data) {
 						"Registration successful!\nPlease login through the login page",
 				});
 				fs.writeFileSync(
-					`${data.username}_private_key.pem`,
+					`keys/${data.username}_private_key.pem`,
 					keyPair.privateKey
 				);
 			} else {
@@ -177,6 +241,7 @@ ipcMain.on("get-user-data", function (event, arg) {
 	const socket = connectToServer();
 	socket.emit("get-user-data", { token: token }, (response) => {
 		if (response.success) {
+			console.log("user-data", response.data);
 			userData.rooms = response.data?.rooms;
 			userData.users = response.data?.users;
 			userData.publicChannels = response.data?.publicChannels;
@@ -190,6 +255,15 @@ ipcMain.on("get-room", function (event, room) {
 	const socket = connectToServer();
 	socket.emit("get-room", { token: token, room: room }, (response) => {
 		if (response.success) {
+			saveCurrentRoomMembers(response.room.members);
+			if (response.room.private || response.room.direct) {
+				console.log("decrypting messages");
+			} else {
+				response.room.history = response.room.history.map((msg) => {
+					msg.content = msg.content.toString("utf-8");
+					return msg;
+				});
+			}
 			event.sender.send("set-room", response.room);
 		}
 	});
@@ -199,6 +273,15 @@ ipcMain.on("send-message", function (event, data) {
 	if (!token) openLogin();
 	const socket = connectToServer();
 	data.token = token;
+	console.log("sending message", data);
+	if (isDirectOrPrivate(data.message.room)) {
+		const aesKey = generateAesKey();
+		console.log("aesKey", aesKey);
+		data.message.content = encryptMessage(data.message.content, aesKey);
+		data.decryptionKeys = encryptAesKey(aesKey, currentRoomMembers);
+	} else {
+		data.message.content = Buffer.from(data.message.content, "utf-8");
+	}
 	socket.emit("send-message", data, (response) => {
 		if (!response.success) {
 			dialog.showMessageBox(win, {
