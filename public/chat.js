@@ -93,7 +93,7 @@ function loadPage(userData) {
 	 * updates a user in the user list
 	 * @param {string} username - the username of the user to update
 	 * @param {boolean} active - the new active state of the user
-	 * 
+	 *
 	 */
 	function updateUser(username, active) {
 		if (!users[username]) users[username] = { username: username };
@@ -147,6 +147,7 @@ function loadPage(userData) {
 	 * This updates a room in the room list given a room
 	 */
 	function updateRoom(room) {
+		rooms = rooms.filter((r) => r.ID !== room.ID);
 		rooms.push(room);
 		rooms.sort((a, b) => a.ID - b.ID);
 		updateRoomList();
@@ -372,7 +373,7 @@ function loadPage(userData) {
 		const room = binarySearch(rooms, data.room, (room) => room.ID);
 		if (room) {
 			room.members = data.members;
-			if (room === currentRoom) setRoom(data.room);
+			if (room.ID === currentRoom.ID) setRoom(data.room);
 		}
 	});
 

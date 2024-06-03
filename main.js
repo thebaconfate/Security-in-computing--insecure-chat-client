@@ -14,10 +14,10 @@ let connected;
 let token;
 let socket;
 let win;
-let currentRoomMembers = [];
+let currentRoom;
 
-function saveCurrentRoomMembers(members) {
-	currentRoomMembers = members;
+function saveCurrentRoom(room) {
+	currentRoom = { ID: room.ID, members: room.members };
 }
 
 function getPrivateKey() {
@@ -137,6 +137,7 @@ function initSocket(socket) {
 
 	socket.on("update_room", (room) => {
 		console.log("update_room", room);
+		if (room.ID === currentRoom.ID) saveCurrentRoom(room);
 		win.webContents.send("update_room", room);
 	});
 
@@ -145,10 +146,14 @@ function initSocket(socket) {
 	});
 
 	socket.on("remove_room", (room) => {
+		if (room.ID === currentRoom.ID) currentRoom = undefined;
 		win.webContents.send("remove_room", room);
 	});
 
 	socket.on("update_user", (data) => {
+		console.log("update_user", data);
+		if (data.action === "removed" && data.room == currentRoom.ID)
+			saveCurrentRoom({ ID: data.room, members: data.members });
 		win.webContents.send("update_user", data);
 	});
 	socket.on("user_state_change", (data) => {
@@ -255,9 +260,14 @@ ipcMain.on("get-room", function (event, room) {
 	const socket = connectToServer();
 	socket.emit("get-room", { token: token, room: room }, (response) => {
 		if (response.success) {
-			saveCurrentRoomMembers(response.room.members);
+			saveCurrentRoom(response.room);
 			if (response.room.private || response.room.direct) {
-				console.log("decrypting messages");
+				response.room.history = response.room.history.map((msg) => {
+					const privateKey = getPrivateKey();
+					const decryptionKey = decryptAesKey(msg.decryptionKey, privateKey);
+					msg.content = decryptMessage(msg.content, decryptionKey);
+					return msg;
+				});
 			} else {
 				response.room.history = response.room.history.map((msg) => {
 					msg.content = msg.content.toString("utf-8");
@@ -278,7 +288,7 @@ ipcMain.on("send-message", function (event, data) {
 		const aesKey = generateAesKey();
 		console.log("aesKey", aesKey);
 		data.message.content = encryptMessage(data.message.content, aesKey);
-		data.decryptionKeys = encryptAesKey(aesKey, currentRoomMembers);
+		data.decryptionKeys = encryptAesKey(aesKey, currentRoom.members);
 	} else {
 		data.message.content = Buffer.from(data.message.content, "utf-8");
 	}
