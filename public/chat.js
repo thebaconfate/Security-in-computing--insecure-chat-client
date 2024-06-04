@@ -2,9 +2,6 @@ const io = require("socket.io-client");
 const electron = require("electron");
 const ipcRenderer = electron.ipcRenderer;
 
-const SERVER = "localhost";
-const PORT = 3000;
-
 function binarySearch(array, key, getProperty = undefined) {
 	let left = 0;
 	let right = array.length - 1;
@@ -23,17 +20,6 @@ function binarySearch(array, key, getProperty = undefined) {
 	return false;
 }
 
-function binaryInsert(array, key, getProperty = undefined) {
-	const index = array.findIndex((element) => {
-		getProperty ? getProperty(element) > key : element > key;
-	});
-	if (index === -1) {
-		array.push(key);
-	} else {
-		array.splice(index, 0, key);
-	}
-}
-
 $(function () {
 	// Get user data
 	ipcRenderer.send("get-user-data");
@@ -43,7 +29,6 @@ $(function () {
 	});
 });
 
-// TODO: refactor, possible memory leak due to event emitters
 function loadPage(userData) {
 	// Initialize variables
 	const $window = $(window);
@@ -65,8 +50,6 @@ function loadPage(userData) {
 
 	// Connect to server
 	let connected = true;
-	let socket = io(`ws://${SERVER}:${PORT}`, { transports: ["websocket"] });
-
 	let modalShowing = false;
 
 	$("#addChannelModal")
@@ -105,7 +88,7 @@ function loadPage(userData) {
 
 	/**
 	 * updates the user list in the UI
-	 * TODO: Make the server return if the user is active or not SEE TODO ABOVE
+	 *
 	 */
 	function updateUserList() {
 		const $uta = $("#usersToAdd");

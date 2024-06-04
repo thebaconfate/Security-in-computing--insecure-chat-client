@@ -5,6 +5,21 @@ const fs = require("fs");
 const SERVER = "localhost";
 const PORT = 3000;
 const crypto = require("crypto");
+const sanitizeHtml = require("sanitize-html");
+const validator = require("validator");
+
+function removeHtmlTags(input) {
+	return sanitizeHtml(input, { allowedTags: [] });
+}
+
+function sanitizeInput(input) {
+	return validator.escape(removeHtmlTags(input));
+}
+
+function sanitizeCredentials(input) {
+	const regex = `a-zA-Z0-9`;
+	return validator.whitelist(removeHtmlTags(input), regex);
+}
 
 let userData = {
 	username: undefined,
@@ -48,9 +63,7 @@ function generateAesKey() {
 }
 
 function encryptAesKey(aesKey, members) {
-	console.log("members", members);
 	return members.map((member) => {
-		console.log("userData", userData);
 		const user =
 			userData.users.find((user) => user.username === member) || userData;
 		return {
@@ -113,8 +126,6 @@ app.whenReady().then(() => {
 
 function initSocket(socket) {
 	socket.on("new message", (message) => {
-		console.log("new message", message);
-
 		const decryptionKeys = message.decryptionKeys;
 		if (decryptionKeys) {
 			const decryptionKey = decryptionKeys.find(
@@ -131,12 +142,10 @@ function initSocket(socket) {
 	});
 
 	socket.on("disconnect", () => {
-		console.log("disconnected");
 		connected = false;
 	});
 
 	socket.on("update_room", (room) => {
-		console.log("update_room", room);
 		if (room.ID === currentRoom.ID) saveCurrentRoom(room);
 		win.webContents.send("update_room", room);
 	});
@@ -151,7 +160,6 @@ function initSocket(socket) {
 	});
 
 	socket.on("update_user", (data) => {
-		console.log("update_user", data);
 		if (data.action === "removed" && data.room == currentRoom.ID)
 			saveCurrentRoom({ ID: data.room, members: data.members });
 		win.webContents.send("update_user", data);
@@ -161,12 +169,16 @@ function initSocket(socket) {
 	});
 }
 
-ipcMain.on("login", function (event, data) {
+ipcMain.on("login", function (event, creds) {
+	if (!creds?.username || !creds?.password) return;
 	const socket = connectToServer();
+	const data = {
+		username: sanitizeCredentials(creds.username),
+		password: sanitizeCredentials(creds.password),
+	};
 	socket.emit("authenticate", data, (response) => {
 		if (response.success) {
 			userData.username = data.username;
-			console.log("response", response);
 			userData.ID = response.ID;
 			token = response.token;
 			userData.publicKey = response.publicKey;
@@ -191,8 +203,12 @@ ipcMain.on("nav-login", function (event, arg) {
 	openLogin();
 });
 
-ipcMain.on("register", function (event, data) {
-	if (data.username && data.password) {
+ipcMain.on("register", function (event, creds) {
+	if (creds?.username && creds?.password) {
+		const data = {
+			username: sanitizeCredentials(creds.username),
+			password: sanitizeCredentials(creds.password),
+		};
 		let socket = connectToServer();
 		const keyPair = crypto.generateKeyPairSync("rsa", {
 			modulusLength: 2048,
@@ -246,7 +262,6 @@ ipcMain.on("get-user-data", function (event, arg) {
 	const socket = connectToServer();
 	socket.emit("get-user-data", { token: token }, (response) => {
 		if (response.success) {
-			console.log("user-data", response.data);
 			userData.rooms = response.data?.rooms;
 			userData.users = response.data?.users;
 			userData.publicChannels = response.data?.publicChannels;
@@ -257,36 +272,45 @@ ipcMain.on("get-user-data", function (event, arg) {
 
 ipcMain.on("get-room", function (event, room) {
 	if (!token) openLogin();
-	const socket = connectToServer();
-	socket.emit("get-room", { token: token, room: room }, (response) => {
-		if (response.success) {
-			saveCurrentRoom(response.room);
-			if (response.room.private || response.room.direct) {
-				response.room.history = response.room.history.map((msg) => {
-					const privateKey = getPrivateKey();
-					const decryptionKey = decryptAesKey(msg.decryptionKey, privateKey);
-					msg.content = decryptMessage(msg.content, decryptionKey);
-					return msg;
-				});
-			} else {
-				response.room.history = response.room.history.map((msg) => {
-					msg.content = msg.content.toString("utf-8");
-					return msg;
-				});
-			}
-			event.sender.send("set-room", response.room);
+	try {
+		if (validator.isInt(room?.toString())) {
+			const socket = connectToServer();
+			socket.emit("get-room", { token: token, room: room }, (response) => {
+				if (response.success) {
+					saveCurrentRoom(response.room);
+					if (response.room.private || response.room.direct) {
+						response.room.history = response.room.history.map((msg) => {
+							const privateKey = getPrivateKey();
+							const decryptionKey = decryptAesKey(
+								msg.decryptionKey,
+								privateKey
+							);
+							msg.content = decryptMessage(msg.content, decryptionKey);
+							return msg;
+						});
+					} else {
+						response.room.history = response.room.history.map((msg) => {
+							msg.content = msg.content.toString("utf-8");
+							return msg;
+						});
+					}
+					event.sender.send("set-room", response.room);
+				}
+			});
 		}
-	});
+	} catch (e) {
+		return;
+	}
 });
 
+// TODO: validate and sanitize the send message request
 ipcMain.on("send-message", function (event, data) {
+	console.log("send-message", data);
 	if (!token) openLogin();
 	const socket = connectToServer();
 	data.token = token;
-	console.log("sending message", data);
 	if (isDirectOrPrivate(data.message.room)) {
 		const aesKey = generateAesKey();
-		console.log("aesKey", aesKey);
 		data.message.content = encryptMessage(data.message.content, aesKey);
 		data.decryptionKeys = encryptAesKey(aesKey, currentRoom.members);
 	} else {
@@ -305,37 +329,55 @@ ipcMain.on("send-message", function (event, data) {
 	});
 });
 
-ipcMain.on("request_direct_room", function (event, data) {
+ipcMain.on("request_direct_room", function (event, recipient) {
 	if (!token) openLogin();
-	const socket = connectToServer();
-	data.token = token;
-	socket.emit("request_direct_room", data, (response) => {
-		event.sender.send("requested_direct_room", response);
-	});
+	try {
+		if (recipient?.to && validator.isInt(recipient.to?.toString())) {
+			const data = {
+				to: recipient.to,
+				token: token,
+			};
+			console.log("request_direct_room", data);
+			const socket = connectToServer();
+			socket.emit("request_direct_room", data, (response) => {
+				event.sender.send("requested_direct_room", response);
+			});
+		}
+	} catch (e) {
+		return;
+	}
 });
 
+// TODO: validate and sanitize the add_channel request
 ipcMain.on("add_channel", function (event, data) {
+	console.log("add_channel", data);
 	if (!token) openLogin();
 	const socket = connectToServer();
 	data.token = token;
 	socket.emit("add_channel", data);
 });
 
+// TODO: validate and sanitize the join channel request
 ipcMain.on("join_channel", function (event, data) {
+	console.log("join_channel", data);
 	if (!token) openLogin();
 	const socket = connectToServer();
 	data.token = token;
 	socket.emit("join_channel", data);
 });
 
+// TODO: validate and sanitize the add user to channel request
 ipcMain.on("add_user_to_channel", function (event, data) {
+	console.log("add_user_to_channel", data);
 	if (!token) openLogin();
 	const socket = connectToServer();
 	data.token = token;
 	socket.emit("add_user_to_channel", data);
 });
 
+// TODO: validate and sanitize the leave channel request
 ipcMain.on("leave_channel", function (event, data) {
+	console.log("leave_channel", data);
 	if (!token) openLogin();
 	const socket = connectToServer();
 	data.token = token;
