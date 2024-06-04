@@ -37,7 +37,10 @@ function saveCurrentRoom(room) {
 
 function getPrivateKey() {
 	if (userData.username)
-		return fs.readFileSync(`${userData.username}_private_key.pem`, "utf-8");
+		return fs.readFileSync(
+			`keys/${userData.username}_private_key.pem`,
+			"utf-8"
+		);
 	return null;
 }
 
