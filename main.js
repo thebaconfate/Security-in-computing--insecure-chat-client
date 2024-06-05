@@ -8,12 +8,19 @@ const crypto = require("crypto");
 const sanitizeHtml = require("sanitize-html");
 const validator = require("validator");
 
+const keysDir = "keys";
+if (!fs.existsSync(keysDir)) fs.mkdirSync(keysDir);
+
 function removeHtmlTags(input) {
 	return sanitizeHtml(input, { allowedTags: [] });
 }
 
-function sanitizeInput(input) {
+function pureSanitizeInput(input) {
 	return validator.escape(removeHtmlTags(input));
+}
+
+function sanitizeInput(input) {
+	return validator.escape(input);
 }
 
 function sanitizeCredentials(input) {
@@ -167,6 +174,14 @@ function initSocket(socket) {
 			saveCurrentRoom({ ID: data.room, members: data.members });
 		win.webContents.send("update_user", data);
 	});
+
+	socket.on("new-user", (user) => {
+		if (userData?.users) {
+			userData.users.push(user);
+			win.webContents.send("new_user", user);
+		}
+	});
+
 	socket.on("user_state_change", (data) => {
 		win.webContents.send("user_state_change", data);
 	});
@@ -306,30 +321,44 @@ ipcMain.on("get-room", function (event, room) {
 	}
 });
 
-// TODO: validate and sanitize the send message request
-ipcMain.on("send-message", function (event, data) {
-	console.log("send-message", data);
-	if (!token) openLogin();
-	const socket = connectToServer();
-	data.token = token;
-	if (isDirectOrPrivate(data.message.room)) {
-		const aesKey = generateAesKey();
-		data.message.content = encryptMessage(data.message.content, aesKey);
-		data.decryptionKeys = encryptAesKey(aesKey, currentRoom.members);
-	} else {
-		data.message.content = Buffer.from(data.message.content, "utf-8");
-	}
-	socket.emit("send-message", data, (response) => {
-		if (!response.success) {
-			dialog.showMessageBox(win, {
-				type: "warning",
-				buttons: ["Ok"],
-				title: "Failure",
-				normalizeAccessKeys: true,
-				message: response.reason || "Failed to send message",
+ipcMain.on("send-message", function (event, rawData) {
+	try {
+		if (
+			rawData?.message?.content &&
+			rawData?.message?.room &&
+			validator.isInt(rawData.message.room.toString())
+		) {
+			const data = {
+				message: {
+					content: sanitizeInput(rawData.message.content),
+					room: rawData.message.room,
+				},
+				token: token,
+			};
+			if (!token) openLogin();
+			const socket = connectToServer();
+			if (isDirectOrPrivate(data.message.room)) {
+				const aesKey = generateAesKey();
+				data.message.content = encryptMessage(data.message.content, aesKey);
+				data.decryptionKeys = encryptAesKey(aesKey, currentRoom.members);
+			} else {
+				data.message.content = Buffer.from(data.message.content, "utf-8");
+			}
+			socket.emit("send-message", data, (response) => {
+				if (!response.success) {
+					dialog.showMessageBox(win, {
+						type: "warning",
+						buttons: ["Ok"],
+						title: "Failure",
+						normalizeAccessKeys: true,
+						message: response.reason || "Failed to send message",
+					});
+				}
 			});
 		}
-	});
+	} catch (e) {
+		return;
+	}
 });
 
 ipcMain.on("request_direct_room", function (event, recipient) {
@@ -340,7 +369,6 @@ ipcMain.on("request_direct_room", function (event, recipient) {
 				to: recipient.to,
 				token: token,
 			};
-			console.log("request_direct_room", data);
 			const socket = connectToServer();
 			socket.emit("request_direct_room", data, (response) => {
 				event.sender.send("requested_direct_room", response);
@@ -351,38 +379,73 @@ ipcMain.on("request_direct_room", function (event, recipient) {
 	}
 });
 
-// TODO: validate and sanitize the add_channel request
-ipcMain.on("add_channel", function (event, data) {
-	console.log("add_channel", data);
+ipcMain.on("add_channel", function (event, rawData) {
 	if (!token) openLogin();
-	const socket = connectToServer();
-	data.token = token;
-	socket.emit("add_channel", data);
+	try {
+		if (
+			rawData?.name &&
+			rawData?.description &&
+			rawData?.private &&
+			validator.isBoolean(rawData.private.toString())
+		) {
+			const data = {
+				name: removeHtmlTags(rawData.name),
+				description: removeHtmlTags(rawData.description),
+				private: rawData.private,
+				token: token,
+			};
+			const socket = connectToServer();
+			socket.emit("add_channel", data);
+		}
+	} catch (e) {
+		return;
+	}
 });
 
-// TODO: validate and sanitize the join channel request
-ipcMain.on("join_channel", function (event, data) {
-	console.log("join_channel", data);
+ipcMain.on("join_channel", function (event, rawData) {
 	if (!token) openLogin();
-	const socket = connectToServer();
-	data.token = token;
-	socket.emit("join_channel", data);
+	try {
+		if (validator.isInt(rawData?.ID?.toString())) {
+			const data = { ID: rawData.ID, token: token };
+			const socket = connectToServer();
+			data.token = token;
+			socket.emit("join_channel", data);
+		}
+	} catch (e) {
+		return;
+	}
 });
 
-// TODO: validate and sanitize the add user to channel request
-ipcMain.on("add_user_to_channel", function (event, data) {
-	console.log("add_user_to_channel", data);
+ipcMain.on("add_user_to_channel", function (event, rawData) {
 	if (!token) openLogin();
-	const socket = connectToServer();
-	data.token = token;
-	socket.emit("add_user_to_channel", data);
+	try {
+		if (
+			rawData?.channel &&
+			rawData?.user &&
+			validator.isInt(rawData.channel.toString())
+		) {
+			const data = {
+				channel: rawData.channel,
+				user: sanitizeCredentials(rawData.user),
+				token: token,
+			};
+			const socket = connectToServer();
+			socket.emit("add_user_to_channel", data);
+		}
+	} catch (e) {
+		return;
+	}
 });
 
-// TODO: validate and sanitize the leave channel request
-ipcMain.on("leave_channel", function (event, data) {
-	console.log("leave_channel", data);
+ipcMain.on("leave_channel", function (event, rawData) {
 	if (!token) openLogin();
-	const socket = connectToServer();
-	data.token = token;
-	socket.emit("leave_channel", data);
+	try {
+		if (validator.isInt(rawData?.ID?.toString())) {
+			const socket = connectToServer();
+			const data = { ID: rawData.ID, token: token };
+			socket.emit("leave_channel", data);
+		}
+	} catch (e) {
+		return;
+	}
 });

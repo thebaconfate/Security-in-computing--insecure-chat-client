@@ -313,8 +313,6 @@ function loadPage(userData) {
 	/////////////////////
 
 	$window.on("keydown", (event) => {
-		console.log(modalShowing);
-		console.log(event.which);
 		if (modalShowing) return;
 
 		// Autofocus the current input when a key is typed
@@ -369,6 +367,11 @@ function loadPage(userData) {
 			currentRoom.history.push(msg);
 			addChatMessage(msg);
 		}
+	});
+
+	ipcRenderer.on("new_user", function (event, user) {
+		users[user.username] = user;
+		updateUserList();
 	});
 
 	ipcRenderer.on("set-room", function (event, room) {
