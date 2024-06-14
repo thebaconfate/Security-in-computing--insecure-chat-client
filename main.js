@@ -37,6 +37,7 @@ let token;
 let socket;
 let win;
 let currentRoom;
+let serverPublicKey;
 
 function saveCurrentRoom(room) {
 	currentRoom = { ID: room.ID, members: room.members };
@@ -92,6 +93,11 @@ function isDirectOrPrivate(roomID) {
 	return room == undefined || room.private;
 }
 
+function encryptPublicMessage(message) {
+	console.log("encryptPublicMessage", serverPublicKey);
+	return crypto.publicEncrypt(serverPublicKey, message);
+}
+
 function openLogin() {
 	win.loadFile("public/login.html");
 }
@@ -137,17 +143,9 @@ app.whenReady().then(() => {
 function initSocket(socket) {
 	socket.on("new message", (message) => {
 		const decryptionKeys = message.decryptionKeys;
-		if (decryptionKeys) {
-			const decryptionKey = decryptionKeys.find(
-				(key) => key.ID === userData.ID
-			);
-			if (decryptionKey) {
-				const aesKey = decryptAesKey(decryptionKey.key, getPrivateKey());
-				message.content = decryptMessage(message.content, aesKey);
-			}
-		} else {
-			message.content = message.content.toString("utf-8");
-		}
+		const decryptionKey = decryptionKeys.find((key) => key.ID === userData.ID);
+		const aesKey = decryptAesKey(decryptionKey.key, getPrivateKey());
+		message.content = decryptMessage(message.content, aesKey);
 		win.webContents.send("new message", message);
 	});
 
@@ -200,6 +198,7 @@ ipcMain.on("login", function (event, creds) {
 			userData.ID = response.ID;
 			token = response.token;
 			userData.publicKey = response.publicKey;
+			serverPublicKey = response.serverPublicKey;
 			openDashboard(win);
 		} else {
 			dialog.showMessageBox(win, {
@@ -296,22 +295,12 @@ ipcMain.on("get-room", function (event, room) {
 			socket.emit("get-room", { token: token, room: room }, (response) => {
 				if (response.success) {
 					saveCurrentRoom(response.room);
-					if (response.room.private || response.room.direct) {
-						response.room.history = response.room.history.map((msg) => {
-							const privateKey = getPrivateKey();
-							const decryptionKey = decryptAesKey(
-								msg.decryptionKey,
-								privateKey
-							);
-							msg.content = decryptMessage(msg.content, decryptionKey);
-							return msg;
-						});
-					} else {
-						response.room.history = response.room.history.map((msg) => {
-							msg.content = msg.content.toString("utf-8");
-							return msg;
-						});
-					}
+					response.room.history = response.room.history.map((msg) => {
+						const privateKey = getPrivateKey();
+						const decryptionKey = decryptAesKey(msg.decryptionKey, privateKey);
+						msg.content = decryptMessage(msg.content, decryptionKey);
+						return msg;
+					});
 					event.sender.send("set-room", response.room);
 				}
 			});
@@ -341,9 +330,7 @@ ipcMain.on("send-message", function (event, rawData) {
 				const aesKey = generateAesKey();
 				data.message.content = encryptMessage(data.message.content, aesKey);
 				data.decryptionKeys = encryptAesKey(aesKey, currentRoom.members);
-			} else {
-				data.message.content = Buffer.from(data.message.content, "utf-8");
-			}
+			} else data.message.content = encryptPublicMessage(data.message.content);
 			socket.emit("send-message", data, (response) => {
 				if (!response.success) {
 					dialog.showMessageBox(win, {
