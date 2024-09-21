@@ -1,7 +1,7 @@
 
 # Insecure Chat Client
 
-A simple insecure chat client
+This is the client side of the Insecure Chat project that is mandatory for the Security in Computing course at the VUB. The course was taken during 2023-2024.
 
 ## How to use
 
